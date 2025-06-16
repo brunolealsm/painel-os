@@ -1,70 +1,108 @@
-# Getting Started with Create React App
+# 🚀 PainelOS
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> Sistema de gestão e controle moderno desenvolvido em React
 
-## Available Scripts
+![React](https://img.shields.io/badge/React-18.2.0-blue.svg)
+![GitHub](https://img.shields.io/badge/GitHub-CLI-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-In the project directory, you can run:
+## 📋 Descrição
 
-### `npm start`
+O **PainelOS** é um sistema de gestão e controle desenvolvido em React com uma interface moderna e intuitiva. Este projeto foi inicializado com uma página "Hello World" personalizada e está totalmente integrado com Git e GitHub CLI.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## ✨ Características
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **⚛️ React**: Construído com a versão mais recente do React
+- **🎨 Design Moderno**: Interface responsiva com gradientes e efeitos visuais
+- **📦 Git Integration**: Controle de versão completo
+- **🚀 GitHub CLI**: Integração total com GitHub para desenvolvimento colaborativo
+- **📱 Responsive**: Adaptável a diferentes tamanhos de tela
 
-### `npm test`
+## 🛠️ Tecnologias Utilizadas
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- React 18.2.0
+- CSS3 com Flexbox e Grid
+- Git & GitHub CLI
+- npm/npx
 
-### `npm run build`
+## 🚀 Como Executar
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Pré-requisitos
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- Node.js (versão 14 ou superior)
+- npm ou yarn
+- Git
+- GitHub CLI (gh)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Instalação
 
-### `npm run eject`
+1. Clone o repositório:
+```bash
+git clone https://github.com/brunolealsm/painel-os.git
+cd painel-os
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+2. Instale as dependências:
+```bash
+npm install
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+3. Execute o projeto:
+```bash
+npm start
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+4. Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 📁 Estrutura do Projeto
 
-## Learn More
+```
+painel-os/
+├── public/
+│   ├── index.html
+│   └── ...
+├── src/
+│   ├── App.js          # Componente principal com Hello World
+│   ├── App.css         # Estilos modernos e responsivos
+│   ├── index.js        # Ponto de entrada da aplicação
+│   └── ...
+├── package.json
+└── README.md
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## 🎯 Próximos Passos
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- [ ] Adicionar roteamento com React Router
+- [ ] Implementar sistema de autenticação
+- [ ] Criar componentes de dashboard
+- [ ] Integrar com APIs externas
+- [ ] Adicionar testes unitários
+- [ ] Configurar CI/CD
 
-### Code Splitting
+## 🤝 Contribuindo
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
 
-### Analyzing the Bundle Size
+## 📝 Scripts Disponíveis
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- `npm start` - Executa a aplicação em modo de desenvolvimento
+- `npm run build` - Cria a build de produção
+- `npm test` - Executa os testes
+- `npm run eject` - Remove o create-react-app (irreversível)
 
-### Making a Progressive Web App
+## 📄 Licença
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
-### Advanced Configuration
+## 👤 Autor
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+**Bruno Leal**
+- GitHub: [@brunolealsm](https://github.com/brunolealsm)
 
-### Deployment
+---
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+⭐ **Se este projeto foi útil para você, considere dar uma estrela!**
