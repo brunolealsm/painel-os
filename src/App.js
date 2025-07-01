@@ -1,4 +1,17 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactFlow, { 
+  MiniMap, 
+  Controls, 
+  Background, 
+  useNodesState, 
+  useEdgesState,
+  ConnectionLineType,
+  MarkerType,
+  Position 
+} from 'reactflow';
+import 'reactflow/dist/style.css';
+import dagre from 'dagre';
+import html2canvas from 'html2canvas';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
 
@@ -428,6 +441,44 @@ function App() {
   // Estados para a barra lateral do equipamento
   const [showEquipmentSidebar, setShowEquipmentSidebar] = useState(false);
   const [selectedEquipmentData, setSelectedEquipmentData] = useState(null);
+
+  // Estados para área Equipe
+  const [teamData, setTeamData] = useState({
+    coordenadores: [
+      { id: 1, nome: 'João Silva', areas: [] },
+      { id: 2, nome: 'Maria Santos', areas: [] },
+      { id: 3, nome: 'Pedro Costa', areas: [] },
+      { id: 4, nome: 'Ana Oliveira', areas: [] }
+    ],
+    areas: [
+      { id: 1, nome: 'Área Norte', coordenadorId: null, tecnicos: [] },
+      { id: 2, nome: 'Área Sul', coordenadorId: null, tecnicos: [] },
+      { id: 3, nome: 'Área Central', coordenadorId: 1, tecnicos: [] }
+    ],
+    tecnicos: [
+      { id: 1, nome: 'Carlos Mendes', areaId: null },
+      { id: 2, nome: 'Ana Paula', areaId: null },
+      { id: 3, nome: 'Roberto Lima', areaId: 3 },
+      { id: 4, nome: 'Fernanda Costa', areaId: null },
+      { id: 5, nome: 'Lucas Oliveira', areaId: null },
+      { id: 6, nome: 'Juliana Santos', areaId: null },
+      { id: 7, nome: 'Ricardo Alves', areaId: 3 },
+      { id: 8, nome: 'Patricia Silva', areaId: null }
+    ]
+  });
+  const [newAreaName, setNewAreaName] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [draggedType, setDraggedType] = useState(null);
+  
+  // Novos states para as melhorias
+  const [technicianSearchTerm, setTechnicianSearchTerm] = useState('');
+  const [areaOptionsMenus, setAreaOptionsMenus] = useState({});
+  const [editingAreaId, setEditingAreaId] = useState(null);
+  const [editingAreaName, setEditingAreaName] = useState('');
+  const [areaActionMenus, setAreaActionMenus] = useState({});
+  const [showManagementDiagram, setShowManagementDiagram] = useState(false);
   
   // Listener para capturar mudanças de scroll
   React.useEffect(() => {
@@ -557,13 +608,36 @@ function App() {
         setShowEquipmentSidebar(false);
         setSelectedEquipmentData(null);
       }
+
+      // Fechar menus de opções das áreas
+      const hasOpenAreaOptions = Object.values(areaOptionsMenus).some(Boolean);
+      if (hasOpenAreaOptions && 
+          !event.target.closest('.area-options-container') && 
+          !event.target.closest('.area-options-menu')) {
+        setAreaOptionsMenus({});
+      }
+
+      // Fechar menus de ação das áreas nos coordenadores
+      const hasOpenAreaActions = Object.values(areaActionMenus).some(Boolean);
+      if (hasOpenAreaActions && 
+          !event.target.closest('.area-action-container') && 
+          !event.target.closest('.area-action-menu')) {
+        setAreaActionMenus({});
+      }
+
+      // Fechar modal do diagrama de gestão
+      if (showManagementDiagram && 
+          !event.target.closest('.management-diagram-modal') && 
+          event.target.classList.contains('modal-overlay')) {
+        setShowManagementDiagram(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, openCityDropdown, showOrderSidebar, showEquipmentSidebar]);
+  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, openCityDropdown, showOrderSidebar, showEquipmentSidebar, areaOptionsMenus, areaActionMenus, showManagementDiagram]);
   const [activeConfigSection, setActiveConfigSection] = useState('database');
   
   // Estado para controlar ordens disponíveis (removidas quando movidas)
@@ -1449,6 +1523,598 @@ function App() {
     } catch (error) {
       console.error('Erro ao formatar data:', error);
       return 'Data inválida';
+    }
+  };
+
+  // Funções para área Equipe
+  const handleCreateArea = () => {
+    if (!newAreaName.trim()) return;
+    
+    const newArea = {
+      id: Math.max(...teamData.areas.map(a => a.id)) + 1,
+      nome: newAreaName.trim(),
+      coordenadorId: null,
+      tecnicos: []
+    };
+    
+    setTeamData(prev => ({
+      ...prev,
+      areas: [...prev.areas, newArea]
+    }));
+    
+    setNewAreaName('');
+  };
+
+  const handleDragStart = (item, type) => {
+    setDraggedItem(item);
+    setDraggedType(type);
+  };
+
+  const handleDrop = (targetId, targetType) => {
+    if (!draggedItem || !draggedType) return;
+
+    let actionDescription = '';
+    let actionFunction = null;
+
+    if (draggedType === 'tecnico' && targetType === 'area') {
+      const tecnico = teamData.tecnicos.find(t => t.id === draggedItem.id);
+      const area = teamData.areas.find(a => a.id === targetId);
+      
+      if (tecnico.areaId === targetId) return; // Já está na área
+      
+      actionDescription = `Vincular "${tecnico.nome}" à área "${area.nome}"?`;
+      actionFunction = () => {
+        setTeamData(prev => ({
+          ...prev,
+          tecnicos: prev.tecnicos.map(t => 
+            t.id === draggedItem.id ? { ...t, areaId: targetId } : t
+          )
+        }));
+      };
+    } else if (draggedType === 'area' && targetType === 'coordenador') {
+      const area = teamData.areas.find(a => a.id === draggedItem.id);
+      const coordenador = teamData.coordenadores.find(c => c.id === targetId);
+      
+      if (area.coordenadorId === targetId) return; // Já está com o coordenador
+      
+      actionDescription = `Vincular área "${area.nome}" ao coordenador "${coordenador.nome}"?`;
+      actionFunction = () => {
+        setTeamData(prev => ({
+          ...prev,
+          areas: prev.areas.map(a => 
+            a.id === draggedItem.id ? { ...a, coordenadorId: targetId } : a
+          )
+        }));
+      };
+    }
+
+    if (actionFunction) {
+      setConfirmAction({
+        description: actionDescription,
+        action: actionFunction
+      });
+      setShowConfirmModal(true);
+    }
+
+    setDraggedItem(null);
+    setDraggedType(null);
+  };
+
+  const confirmDragAction = () => {
+    if (confirmAction) {
+      confirmAction.action();
+    }
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+  };
+
+  const getTecnicosByArea = (areaId) => {
+    return teamData.tecnicos.filter(t => t.areaId === areaId);
+  };
+
+  const getAreasByCoordinator = (coordenadorId) => {
+    return teamData.areas.filter(a => a.coordenadorId === coordenadorId);
+  };
+
+  const getUnassignedTechnicians = () => {
+    return teamData.tecnicos.filter(t => t.areaId === null);
+  };
+
+  const getUnassignedAreas = () => {
+    return teamData.areas.filter(a => a.coordenadorId === null);
+  };
+
+  // Função para filtrar técnicos baseado na busca
+  const getFilteredUnassignedTechnicians = () => {
+    const unassigned = getUnassignedTechnicians();
+    if (!technicianSearchTerm.trim()) {
+      return unassigned;
+    }
+    return unassigned.filter(tecnico => 
+      tecnico.nome.toLowerCase().includes(technicianSearchTerm.toLowerCase())
+    );
+  };
+
+  // Função para remover técnico de uma área
+  const removeTechnicianFromArea = (technicianId) => {
+    setTeamData(prev => ({
+      ...prev,
+      tecnicos: prev.tecnicos.map(t => 
+        t.id === technicianId ? { ...t, areaId: null } : t
+      )
+    }));
+  };
+
+  // Função para editar nome da área
+  const startEditingArea = (areaId, currentName) => {
+    setEditingAreaId(areaId);
+    setEditingAreaName(currentName);
+    setAreaOptionsMenus({});
+  };
+
+  const saveAreaEdit = () => {
+    if (editingAreaName.trim()) {
+      setTeamData(prev => ({
+        ...prev,
+        areas: prev.areas.map(a => 
+          a.id === editingAreaId ? { ...a, nome: editingAreaName.trim() } : a
+        )
+      }));
+    }
+    setEditingAreaId(null);
+    setEditingAreaName('');
+  };
+
+  const cancelAreaEdit = () => {
+    setEditingAreaId(null);
+    setEditingAreaName('');
+  };
+
+  // Função para excluir área
+  const deleteArea = (areaId) => {
+    setConfirmAction({
+      description: 'Tem certeza que deseja excluir esta área? Todos os técnicos vinculados ficarão sem área.',
+      action: () => {
+        setTeamData(prev => ({
+          ...prev,
+          areas: prev.areas.filter(a => a.id !== areaId),
+          tecnicos: prev.tecnicos.map(t => 
+            t.areaId === areaId ? { ...t, areaId: null } : t
+          )
+        }));
+      }
+    });
+    setShowConfirmModal(true);
+    setAreaOptionsMenus({});
+  };
+
+  // Função para desvincular área do coordenador
+  const removeAreaFromCoordinator = (areaId) => {
+    setTeamData(prev => ({
+      ...prev,
+      areas: prev.areas.map(a => 
+        a.id === areaId ? { ...a, coordenadorId: null } : a
+      )
+    }));
+    setAreaActionMenus({});
+  };
+
+  // Função para toggle dos menus de opções
+  const toggleAreaOptionsMenu = (areaId) => {
+    setAreaOptionsMenus(prev => ({
+      ...prev,
+      [areaId]: !prev[areaId]
+    }));
+  };
+
+  const toggleAreaActionMenu = (areaId) => {
+    setAreaActionMenus(prev => ({
+      ...prev,
+      [areaId]: !prev[areaId]
+    }));
+  };
+
+  // Função para abrir modal do diagrama
+  const openManagementDiagram = () => {
+    setShowManagementDiagram(true);
+  };
+
+  // Função para fechar modal do diagrama
+  const closeManagementDiagram = () => {
+    setShowManagementDiagram(false);
+  };
+
+  // Referência para o container do React Flow
+  const reactFlowRef = useRef(null);
+
+  // Função para aplicar layout dagre
+  const getLayoutedElements = (nodes, edges, direction = 'TB') => {
+    const dagreGraph = new dagre.graphlib.Graph();
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+    const nodeWidth = 180;
+    const nodeHeight = 80;
+
+    dagreGraph.setGraph({ 
+      rankdir: direction,
+      nodesep: 50,
+      ranksep: 80,
+      marginx: 20,
+      marginy: 20
+    });
+
+    nodes.forEach((node) => {
+      dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+    });
+
+    edges.forEach((edge) => {
+      dagreGraph.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(dagreGraph);
+
+    nodes.forEach((node) => {
+      const nodeWithPosition = dagreGraph.node(node.id);
+      node.targetPosition = Position.Top;
+      node.sourcePosition = Position.Bottom;
+
+      // Aplicar posição calculada pelo dagre
+      node.position = {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      };
+
+      return node;
+    });
+
+    return { nodes, edges };
+  };
+
+  // Função para gerar nós do React Flow (apenas elementos com relações)
+  const generateNodes = () => {
+    const nodes = [];
+    
+    // Filtrar apenas coordenadores que têm áreas
+    const coordenadoresComAreas = teamData.coordenadores.filter(coordenador => {
+      const areas = getAreasByCoordinator(coordenador.id);
+      return areas.length > 0;
+    });
+
+    // Filtrar apenas áreas que têm técnicos E têm coordenador
+    const areasComTecnicos = teamData.areas.filter(area => {
+      const tecnicos = getTecnicosByArea(area.id);
+      const temCoordenador = area.coordenadorId && coordenadoresComAreas.some(c => c.id === area.coordenadorId);
+      return tecnicos.length > 0 && temCoordenador;
+    });
+
+    // Filtrar apenas técnicos que estão em áreas válidas
+    const tecnicosComArea = teamData.tecnicos.filter(tecnico => {
+      return tecnico.areaId && areasComTecnicos.some(a => a.id === tecnico.areaId);
+    });
+
+    // Coordenadores (apenas os que têm áreas)
+    coordenadoresComAreas.forEach((coordenador) => {
+      const areas = areasComTecnicos.filter(area => area.coordenadorId === coordenador.id);
+      const totalTecnicos = areas.reduce((sum, area) => {
+        return sum + tecnicosComArea.filter(t => t.areaId === area.id).length;
+      }, 0);
+      
+      nodes.push({
+        id: `coord-${coordenador.id}`,
+        type: 'default',
+        position: { x: 0, y: 0 }, // Será calculado pelo dagre
+        data: { 
+          label: (
+            <div className="reactflow-node coordinator-node">
+              <div className="node-title">{coordenador.nome}</div>
+              <div className="node-subtitle">
+                {areas.length} área{areas.length !== 1 ? 's' : ''} • {totalTecnicos} técnico{totalTecnicos !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )
+        },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+      });
+    });
+
+    // Áreas (apenas as que têm técnicos e coordenador)
+    areasComTecnicos.forEach((area) => {
+      const tecnicos = tecnicosComArea.filter(t => t.areaId === area.id);
+      
+      nodes.push({
+        id: `area-${area.id}`,
+        type: 'default',
+        position: { x: 0, y: 0 }, // Será calculado pelo dagre
+        data: { 
+          label: (
+            <div className="reactflow-node area-node">
+              <div className="node-title">{area.nome}</div>
+              <div className="node-subtitle">
+                {tecnicos.length} técnico{tecnicos.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          )
+        },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
+      });
+    });
+
+    // Técnicos (apenas os que têm área)
+    tecnicosComArea.forEach((tecnico) => {
+      const area = areasComTecnicos.find(a => a.id === tecnico.areaId);
+      
+      if (area) {
+        nodes.push({
+          id: `tech-${tecnico.id}`,
+          type: 'default',
+          position: { x: 0, y: 0 }, // Será calculado pelo dagre
+          data: { 
+            label: (
+              <div className="reactflow-node technician-node">
+                <div className="node-title">{tecnico.nome}</div>
+                <div className="node-subtitle">
+                  {area.nome}
+                </div>
+              </div>
+            )
+          },
+          sourcePosition: Position.Bottom,
+          targetPosition: Position.Top,
+        });
+      }
+    });
+
+    return nodes;
+  };
+
+  // Função para gerar arestas do React Flow (apenas conexões válidas)
+  const generateEdges = () => {
+    const edges = [];
+
+    // Filtrar apenas coordenadores que têm áreas
+    const coordenadoresComAreas = teamData.coordenadores.filter(coordenador => {
+      const areas = getAreasByCoordinator(coordenador.id);
+      return areas.length > 0;
+    });
+
+    // Filtrar apenas áreas que têm técnicos E têm coordenador
+    const areasComTecnicos = teamData.areas.filter(area => {
+      const tecnicos = getTecnicosByArea(area.id);
+      const temCoordenador = area.coordenadorId && coordenadoresComAreas.some(c => c.id === area.coordenadorId);
+      return tecnicos.length > 0 && temCoordenador;
+    });
+
+    // Filtrar apenas técnicos que estão em áreas válidas
+    const tecnicosComArea = teamData.tecnicos.filter(tecnico => {
+      return tecnico.areaId && areasComTecnicos.some(a => a.id === tecnico.areaId);
+    });
+
+    // Conexões coordenador -> área (apenas válidas)
+    coordenadoresComAreas.forEach(coordenador => {
+      const areas = areasComTecnicos.filter(area => area.coordenadorId === coordenador.id);
+      areas.forEach(area => {
+        edges.push({
+          id: `edge-coord-${coordenador.id}-area-${area.id}`,
+          source: `coord-${coordenador.id}`,
+          target: `area-${area.id}`,
+          type: 'straight',
+          animated: true,
+          style: { 
+            stroke: '#8b5cf6', 
+            strokeWidth: 2 
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#8b5cf6',
+          },
+        });
+      });
+    });
+
+    // Conexões área -> técnico (apenas válidas)
+    areasComTecnicos.forEach(area => {
+      const tecnicos = tecnicosComArea.filter(tecnico => tecnico.areaId === area.id);
+      tecnicos.forEach(tecnico => {
+        edges.push({
+          id: `edge-area-${area.id}-tech-${tecnico.id}`,
+          source: `area-${area.id}`,
+          target: `tech-${tecnico.id}`,
+          type: 'straight',
+          animated: true,
+          style: { 
+            stroke: '#3b82f6', 
+            strokeWidth: 2 
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#3b82f6',
+          },
+        });
+      });
+    });
+
+    return edges;
+  };
+
+  // Função para imprimir diagrama (capturando o React Flow real)
+  const printManagementDiagram = async () => {
+    if (!reactFlowRef.current) {
+      console.error('Referência do React Flow não encontrada');
+      return;
+    }
+
+    try {
+      // Ocultar temporariamente controles para captura limpa
+      const controls = reactFlowRef.current.querySelector('.react-flow__controls');
+      const minimap = reactFlowRef.current.querySelector('.react-flow__minimap');
+      const attribution = reactFlowRef.current.querySelector('.react-flow__attribution');
+      
+      const originalControlsDisplay = controls ? controls.style.display : null;
+      const originalMinimapDisplay = minimap ? minimap.style.display : null;
+      const originalAttributionDisplay = attribution ? attribution.style.display : null;
+      
+      if (controls) controls.style.display = 'none';
+      if (minimap) minimap.style.display = 'none';
+      if (attribution) attribution.style.display = 'none';
+
+      // Capturar o React Flow como canvas
+      const canvas = await html2canvas(reactFlowRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Alta qualidade
+        useCORS: true,
+        allowTaint: true,
+        width: reactFlowRef.current.offsetWidth,
+        height: reactFlowRef.current.offsetHeight,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      // Restaurar controles
+      if (controls) controls.style.display = originalControlsDisplay || '';
+      if (minimap) minimap.style.display = originalMinimapDisplay || '';
+      if (attribution) attribution.style.display = originalAttributionDisplay || '';
+
+      // Converter canvas para imagem
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Aplicar os mesmos filtros para contagem
+      const coordenadoresComAreas = teamData.coordenadores.filter(coordenador => {
+        const areas = getAreasByCoordinator(coordenador.id);
+        return areas.length > 0;
+      });
+
+      const areasComTecnicos = teamData.areas.filter(area => {
+        const tecnicos = getTecnicosByArea(area.id);
+        const temCoordenador = area.coordenadorId && coordenadoresComAreas.some(c => c.id === area.coordenadorId);
+        return tecnicos.length > 0 && temCoordenador;
+      });
+
+      const tecnicosComArea = teamData.tecnicos.filter(tecnico => {
+        return tecnico.areaId && areasComTecnicos.some(a => a.id === tecnico.areaId);
+      });
+
+      // Criar janela de impressão com a imagem capturada
+      const printWindow = window.open('', '_blank');
+      
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Diagrama de Gestão de Equipe - React Flow</title>
+              <style>
+                @page {
+                  size: A4 landscape;
+                  margin: 10mm;
+                }
+                body {
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+                  margin: 0;
+                  padding: 10px;
+                  background: white;
+                  display: flex;
+                  flex-direction: column;
+                  align-items: center;
+                }
+                .print-header {
+                  text-align: center;
+                  margin-bottom: 20px;
+                  width: 100%;
+                }
+                .print-title {
+                  font-size: 20px;
+                  font-weight: 600;
+                  color: #1e293b;
+                  margin: 0 0 8px 0;
+                }
+                .print-subtitle {
+                  font-size: 11px;
+                  color: #64748b;
+                  margin: 3px 0;
+                }
+                .print-stats {
+                  font-size: 10px;
+                  color: #475569;
+                  margin-top: 5px;
+                }
+                .diagram-container {
+                  max-width: 100%;
+                  max-height: 70vh;
+                  overflow: hidden;
+                  display: flex;
+                  justify-content: center;
+                  align-items: center;
+                  border: 1px solid #e2e8f0;
+                  border-radius: 8px;
+                  padding: 10px;
+                  background: #f8fafc;
+                }
+                .diagram-image {
+                  max-width: 100%;
+                  max-height: 100%;
+                  object-fit: contain;
+                  border-radius: 4px;
+                }
+                .print-footer {
+                  margin-top: 15px;
+                  text-align: center;
+                  font-size: 9px;
+                  color: #94a3b8;
+                  border-top: 1px solid #e2e8f0;
+                  padding-top: 10px;
+                  width: 100%;
+                }
+                @media print {
+                  body {
+                    padding: 5px;
+                  }
+                  .print-header {
+                    margin-bottom: 15px;
+                  }
+                  .diagram-container {
+                    border: none;
+                    background: white;
+                    padding: 5px;
+                  }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="print-header">
+                <h1 class="print-title">Diagrama de Gestão de Equipe</h1>
+                <p class="print-subtitle">Data: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+                <div class="print-stats">
+                  Coordenadores: ${coordenadoresComAreas.length} | Áreas: ${areasComTecnicos.length} | Técnicos: ${tecnicosComArea.length}
+                </div>
+              </div>
+              
+              <div class="diagram-container">
+                <img src="${imgData}" alt="Diagrama de Gestão de Equipe" class="diagram-image" />
+              </div>
+              
+              <div class="print-footer">
+                Exibindo apenas elementos com relacionamentos ativos
+              </div>
+            </body>
+          </html>
+        `);
+        
+        printWindow.document.close();
+        
+        // Aguardar carregamento da imagem antes de imprimir
+        const img = printWindow.document.querySelector('.diagram-image');
+        img.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+          }, 500);
+        };
+      }
+    } catch (error) {
+      console.error('Erro ao capturar o diagrama:', error);
+      alert('Erro ao gerar a impressão. Tente novamente.');
     }
   };
 
@@ -4159,9 +4825,7 @@ function App() {
   };
 
   const EquipmentSidebar = ({ order, isOpen, onClose }) => {
-    if (!isOpen || !order) return null;
-
-    // Estados para controlar dados e loading
+    // Estados para controlar dados e loading (movidos para antes do return condicional)
     const [expandedCard, setExpandedCard] = useState(null);
     const [lastServiceData, setLastServiceData] = useState(null);
     const [historyData, setHistoryData] = useState([]);
@@ -4174,6 +4838,9 @@ function App() {
         fetchEquipmentData();
       }
     }, [isOpen, order]);
+
+    // Return condicional movido para após os hooks
+    if (!isOpen || !order) return null;
 
     const fetchEquipmentData = async () => {
       if (!order.numeroSerie) {
@@ -4856,9 +5523,498 @@ function App() {
       )}
 
       {!showConfigMenu && activeSection === 'Equipe' && (
-        <div className="section-placeholder">
-          <h2>Seção Equipe</h2>
-          <p>Conteúdo da equipe será implementado aqui</p>
+        <div className="team-section">
+          {/* Header com cadastro de área */}
+          <div className="team-header">
+            <div className="team-title">
+              <h2>Gestão de Equipe</h2>
+              <p>Organize técnicos, áreas e coordenadores</p>
+            </div>
+            <div className="header-actions">
+              <button 
+                onClick={openManagementDiagram}
+                className="btn-view-diagram"
+              >
+                <i className="bi bi-diagram-3"></i>
+                Visualizar gestão
+              </button>
+              
+              <div className="header-divider">|</div>
+              
+              <div className="area-creation">
+                <div className="form-group-inline">
+                  <input
+                    type="text"
+                    placeholder="Nome da nova área"
+                    value={newAreaName}
+                    onChange={(e) => setNewAreaName(e.target.value)}
+                    className="area-input"
+                    onKeyPress={(e) => e.key === 'Enter' && handleCreateArea()}
+                  />
+                  <button 
+                    onClick={handleCreateArea}
+                    className="btn-create-area"
+                    disabled={!newAreaName.trim()}
+                  >
+                    <i className="bi bi-plus-circle"></i>
+                    Criar Área
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Área principal com layout de colunas */}
+          <div className="team-board">
+            {/* Coluna de técnicos não vinculados */}
+            <div className="team-column">
+              <div className="team-column-header">
+                <h3>Técnicos Disponíveis</h3>
+                <span className="team-count">{getFilteredUnassignedTechnicians().length}</span>
+              </div>
+              
+              {/* Campo de busca de técnicos */}
+              <div className="technician-search-container">
+                <div className="search-input-group">
+                  <i className="bi bi-search"></i>
+                  <input
+                    type="text"
+                    placeholder="Buscar técnico..."
+                    value={technicianSearchTerm}
+                    onChange={(e) => setTechnicianSearchTerm(e.target.value)}
+                    className="technician-search-input"
+                  />
+                  {technicianSearchTerm && (
+                    <button 
+                      className="clear-search-btn"
+                      onClick={() => setTechnicianSearchTerm('')}
+                    >
+                      <i className="bi bi-x"></i>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="team-column-content">
+                {getFilteredUnassignedTechnicians().map(tecnico => (
+                  <div
+                    key={tecnico.id}
+                    className="team-item tecnico-item compact"
+                    draggable
+                    onDragStart={() => handleDragStart(tecnico, 'tecnico')}
+                  >
+                    <i className="bi bi-person"></i>
+                    <span>{tecnico.nome}</span>
+                  </div>
+                ))}
+                {getFilteredUnassignedTechnicians().length === 0 && technicianSearchTerm && (
+                  <div className="empty-state">
+                    <i className="bi bi-search"></i>
+                    <span>Nenhum técnico encontrado</span>
+                  </div>
+                )}
+                {getUnassignedTechnicians().length === 0 && !technicianSearchTerm && (
+                  <div className="empty-state">
+                    <i className="bi bi-check-circle"></i>
+                    <span>Todos os técnicos estão vinculados</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Colunas de áreas */}
+            <div className="areas-container">
+              {/* Áreas não vinculadas a coordenadores */}
+              <div className="areas-section">
+                <div className="section-title-clean">
+                  <h3>Áreas <span className="section-count-inline">({getUnassignedAreas().length})</span></h3>
+                </div>
+                {getUnassignedAreas().length > 0 ? (
+                  <div className="areas-grid">
+                    {getUnassignedAreas().map(area => (
+                      <div
+                        key={area.id}
+                        className="area-card"
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleDrop(area.id, 'area');
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                      >
+                        <div 
+                          className="area-header"
+                          draggable
+                          onDragStart={() => handleDragStart(area, 'area')}
+                        >
+                          <div className="area-title">
+                            <i className="bi bi-diagram-3"></i>
+                            {editingAreaId === area.id ? (
+                              <div className="area-edit-form">
+                                <input
+                                  type="text"
+                                  value={editingAreaName}
+                                  onChange={(e) => setEditingAreaName(e.target.value)}
+                                  className="area-edit-input"
+                                  onKeyPress={(e) => e.key === 'Enter' && saveAreaEdit()}
+                                  autoFocus
+                                />
+                                <div className="area-edit-actions">
+                                  <button onClick={saveAreaEdit} className="btn-save">
+                                    <i className="bi bi-check"></i>
+                                  </button>
+                                  <button onClick={cancelAreaEdit} className="btn-cancel">
+                                    <i className="bi bi-x"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <span>{area.nome}</span>
+                            )}
+                          </div>
+                          <div className="area-header-actions">
+                            <span className="area-tech-count">{getTecnicosByArea(area.id).length}</span>
+                            {editingAreaId !== area.id && (
+                              <div className="area-options-container">
+                                <button 
+                                  className="area-options-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleAreaOptionsMenu(area.id);
+                                  }}
+                                >
+                                  <i className="bi bi-three-dots"></i>
+                                </button>
+                                {areaOptionsMenus[area.id] && (
+                                  <div className="area-options-menu">
+                                    <button 
+                                      onClick={() => startEditingArea(area.id, area.nome)}
+                                      className="options-menu-item"
+                                    >
+                                      <i className="bi bi-pencil"></i>
+                                      Alterar nome
+                                    </button>
+                                    <button 
+                                      onClick={() => deleteArea(area.id)}
+                                      className="options-menu-item delete"
+                                    >
+                                      <i className="bi bi-trash"></i>
+                                      Excluir área
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="area-technicians">
+                          {getTecnicosByArea(area.id).map(tecnico => (
+                            <div key={tecnico.id} className="area-tech-item">
+                              <div className="tech-info">
+                                <i className="bi bi-person-fill"></i>
+                                <span>{tecnico.nome}</span>
+                              </div>
+                              <button 
+                                className="remove-tech-btn"
+                                onClick={() => removeTechnicianFromArea(tecnico.id)}
+                                title="Remover técnico"
+                              >
+                                <i className="bi bi-x"></i>
+                              </button>
+                            </div>
+                          ))}
+                          {getTecnicosByArea(area.id).length === 0 && (
+                            <div className="area-drop-zone">
+                              <i className="bi bi-arrow-down-circle"></i>
+                              <span>Arraste técnicos aqui</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  // Quando não há áreas, mostrar coordenadores logo abaixo
+                  <div className="coordinators-section">
+                    <div className="section-title-clean">
+                      <h3>Coordenadores <span className="section-count-inline">({teamData.coordenadores.length})</span></h3>
+                    </div>
+                    <div className="coordinators-grid">
+                      {teamData.coordenadores.map(coordenador => {
+                        const areas = getAreasByCoordinator(coordenador.id);
+                        const totalTecnicos = areas.reduce((sum, area) => sum + getTecnicosByArea(area.id).length, 0);
+                        
+                        return (
+                          <div
+                            key={coordenador.id}
+                            className="coordinator-card"
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              handleDrop(coordenador.id, 'coordenador');
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                          >
+                            <div className="coordinator-header">
+                              <div className="coordinator-info">
+                                <i className="bi bi-person-badge"></i>
+                                <div>
+                                  <h4>{coordenador.nome}</h4>
+                                  <span className="coordinator-stats">
+                                    {areas.length} área{areas.length !== 1 ? 's' : ''} • {totalTecnicos} técnico{totalTecnicos !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="coordinator-areas">
+                              {areas.map(area => (
+                                <div key={area.id} className="coordinator-area-item">
+                                  <div className="area-name">
+                                    <div className="area-name-content">
+                                      <i className="bi bi-diagram-3-fill"></i>
+                                      <span>{area.nome}</span>
+                                      <span className="area-tech-badge">{getTecnicosByArea(area.id).length}</span>
+                                    </div>
+                                    <div className="area-action-container">
+                                      <button 
+                                        className="area-action-btn"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleAreaActionMenu(area.id);
+                                        }}
+                                      >
+                                        <i className="bi bi-three-dots"></i>
+                                      </button>
+                                      {areaActionMenus[area.id] && (
+                                        <div className="area-action-menu">
+                                          <button 
+                                            onClick={() => removeAreaFromCoordinator(area.id)}
+                                            className="action-menu-item"
+                                          >
+                                            <i className="bi bi-arrow-up"></i>
+                                            Configurar área
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="area-technicians-list">
+                                    {getTecnicosByArea(area.id).map(tecnico => (
+                                      <span key={tecnico.id} className="tech-tag">
+                                        {tecnico.nome}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                              {areas.length === 0 && (
+                                <div className="coordinator-drop-zone">
+                                  <i className="bi bi-arrow-down-circle"></i>
+                                  <span>Arraste áreas aqui</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Coordenadores com suas áreas - só aparece quando há áreas */}
+              {getUnassignedAreas().length > 0 && (
+                <div className="coordinators-section">
+                <div className="section-title-clean">
+                  <h3>Coordenadores <span className="section-count-inline">({teamData.coordenadores.length})</span></h3>
+                </div>
+                <div className="coordinators-grid">
+                  {teamData.coordenadores.map(coordenador => {
+                    const areas = getAreasByCoordinator(coordenador.id);
+                    const totalTecnicos = areas.reduce((sum, area) => sum + getTecnicosByArea(area.id).length, 0);
+                    
+                    return (
+                      <div
+                        key={coordenador.id}
+                        className="coordinator-card"
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleDrop(coordenador.id, 'coordenador');
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                      >
+                        <div className="coordinator-header">
+                          <div className="coordinator-info">
+                            <i className="bi bi-person-badge"></i>
+                            <div>
+                              <h4>{coordenador.nome}</h4>
+                              <span className="coordinator-stats">
+                                {areas.length} área{areas.length !== 1 ? 's' : ''} • {totalTecnicos} técnico{totalTecnicos !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="coordinator-areas">
+                          {areas.map(area => (
+                            <div key={area.id} className="coordinator-area-item">
+                              <div className="area-name">
+                                <div className="area-name-content">
+                                  <i className="bi bi-diagram-3-fill"></i>
+                                  <span>{area.nome}</span>
+                                  <span className="area-tech-badge">{getTecnicosByArea(area.id).length}</span>
+                                </div>
+                                <div className="area-action-container">
+                                  <button 
+                                    className="area-action-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleAreaActionMenu(area.id);
+                                    }}
+                                  >
+                                    <i className="bi bi-three-dots"></i>
+                                  </button>
+                                  {areaActionMenus[area.id] && (
+                                    <div className="area-action-menu">
+                                      <button 
+                                        onClick={() => removeAreaFromCoordinator(area.id)}
+                                        className="action-menu-item"
+                                      >
+                                        <i className="bi bi-arrow-up"></i>
+                                        Configurar área
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="area-technicians-list">
+                                {getTecnicosByArea(area.id).map(tecnico => (
+                                  <span key={tecnico.id} className="tech-tag">
+                                    {tecnico.nome}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          {areas.length === 0 && (
+                            <div className="coordinator-drop-zone">
+                              <i className="bi bi-arrow-down-circle"></i>
+                              <span>Arraste áreas aqui</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </div>
+          </div>
+
+          {/* Modal de confirmação */}
+          {showConfirmModal && (
+            <div className="modal-overlay">
+              <div className="confirm-modal">
+                <div className="confirm-header">
+                  <h3>Confirmar Ação</h3>
+                </div>
+                <div className="confirm-content">
+                  <p>{confirmAction?.description}</p>
+                </div>
+                <div className="confirm-actions">
+                  <button 
+                    onClick={() => setShowConfirmModal(false)}
+                    className="btn-cancel"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={confirmDragAction}
+                    className="btn-confirm"
+                  >
+                    Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal do diagrama de gestão */}
+          {showManagementDiagram && (
+            <div className="modal-overlay">
+              <div className="management-diagram-modal">
+                <div className="diagram-modal-header">
+                  <h2>Diagrama de Gestão de Equipe</h2>
+                  <div className="diagram-modal-actions">
+                    <button 
+                      onClick={printManagementDiagram}
+                      className="btn-print"
+                      title="Imprimir diagrama"
+                    >
+                      <i className="bi bi-printer"></i>
+                      Imprimir
+                    </button>
+                    <button 
+                      onClick={closeManagementDiagram}
+                      className="btn-close-diagram"
+                      title="Fechar"
+                    >
+                      <i className="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="management-diagram-content">
+                  <div className="reactflow-container">
+                    <ReactFlow
+                      ref={reactFlowRef}
+                      {...(() => {
+                        const nodes = generateNodes();
+                        const edges = generateEdges();
+                        return getLayoutedElements(nodes, edges);
+                      })()}
+                      connectionLineType={ConnectionLineType.Straight}
+                      fitView
+                      fitViewOptions={{ padding: 0.3 }}
+                      nodesDraggable={false}
+                      nodesConnectable={false}
+                      elementsSelectable={false}
+                      panOnDrag={true}
+                      zoomOnScroll={true}
+                      zoomOnPinch={true}
+                      preventScrolling={false}
+                      defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+                      minZoom={0.3}
+                      maxZoom={2}
+                      attributionPosition="bottom-left"
+                    >
+                      <Background color="#f1f5f9" gap={20} />
+                      <MiniMap 
+                        nodeColor="#e2e8f0"
+                        nodeStrokeWidth={2}
+                        nodeBorderRadius={8}
+                        maskColor="rgba(0, 0, 0, 0.1)"
+                        position="bottom-right"
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          width: 150,
+                          height: 100
+                        }}
+                      />
+                      <Controls 
+                        position="top-right"
+                        style={{
+                          background: '#ffffff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px'
+                        }}
+                      />
+                    </ReactFlow>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
