@@ -834,6 +834,15 @@ function App() {
   // Estados para carregar vínculos área-coordenador da API
   const [isLoadingAreaCoord, setIsLoadingAreaCoord] = useState(false);
   const [areaCoordError, setAreaCoordError] = useState(null);
+  
+  // Estados para criação de nova área
+  const [newAreaName, setNewAreaName] = useState('');
+  const [isCreatingArea, setIsCreatingArea] = useState(false);
+  const [createAreaError, setCreateAreaError] = useState('');
+  
+  // Estados para modal de erro de exclusão
+  const [showDeleteErrorModal, setShowDeleteErrorModal] = useState(false);
+  const [deleteErrorMessage, setDeleteErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -2279,6 +2288,126 @@ function App() {
   };
 
 
+
+  // Função para criar nova área
+  const createNewArea = async () => {
+    if (!newAreaName.trim()) {
+      setCreateAreaError('Nome da área é obrigatório');
+      return;
+    }
+
+    setIsCreatingArea(true);
+    setCreateAreaError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/areas`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newAreaName.trim()
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Área criada com sucesso:', result.data);
+        
+        // Adicionar a nova área ao estado
+        const newArea = {
+          id: result.data.id,
+          nome: result.data.name,
+          coordenadorId: null,
+          tecnicos: []
+        };
+        
+        setTeamData(prev => ({
+          ...prev,
+          areas: [...prev.areas, newArea]
+        }));
+        
+        // Limpar o formulário
+        setNewAreaName('');
+        
+        alert('Área criada com sucesso!');
+      } else {
+        console.error('❌ Erro ao criar área:', result.message);
+        setCreateAreaError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição de criação de área:', error);
+      setCreateAreaError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsCreatingArea(false);
+    }
+  };
+
+  // Função para deletar área
+  const deleteArea = async (areaId) => {
+    const area = teamData.areas.find(a => a.id === areaId);
+    if (!area) return;
+
+    // Verificar se a área tem vínculos antes de tentar deletar
+    const hasTechnicians = getTecnicosByArea(areaId).length > 0;
+    const hasCoordinator = area.coordenadorId !== null;
+
+    if (hasTechnicians || hasCoordinator) {
+      const techCount = getTecnicosByArea(areaId).length;
+      let message = `Não é possível excluir a área "${area.nome}".`;
+      
+      if (hasTechnicians && hasCoordinator) {
+        message += ` Ela possui ${techCount} técnico${techCount > 1 ? 's' : ''} vinculado${techCount > 1 ? 's' : ''} e está associada a um coordenador.`;
+      } else if (hasTechnicians) {
+        message += ` Ela possui ${techCount} técnico${techCount > 1 ? 's' : ''} vinculado${techCount > 1 ? 's' : ''}.`;
+      } else {
+        message += ` Ela está associada a um coordenador.`;
+      }
+      
+      message += ` Para excluir esta área, primeiro remova todos os vínculos.`;
+      
+      setDeleteErrorMessage(message);
+      setShowDeleteErrorModal(true);
+      return;
+    }
+
+    const actionDescription = `Excluir área "${area.nome}"? Esta ação não pode ser desfeita.`;
+    const actionFunction = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/areas/${areaId}`, {
+          method: 'DELETE',
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ Área deletada com sucesso');
+          // Remover a área do estado local
+          setTeamData(prev => ({
+            ...prev,
+            areas: prev.areas.filter(a => a.id !== areaId)
+          }));
+          // Feedback de sucesso pode ser mais sutil, sem alert
+          console.log('✅ Área deletada com sucesso');
+        } else {
+          console.error('❌ Erro ao deletar área:', result.message);
+          setDeleteErrorMessage(`Erro ao deletar área: ${result.message}`);
+          setShowDeleteErrorModal(true);
+        }
+      } catch (error) {
+        console.error('❌ Erro na requisição de exclusão de área:', error);
+        setDeleteErrorMessage(`Erro de conexão: ${error.message}`);
+        setShowDeleteErrorModal(true);
+      }
+    };
+
+    setConfirmAction({
+      description: actionDescription,
+      action: actionFunction
+    });
+    setShowConfirmModal(true);
+  };
 
   // Função para desvincular área do coordenador
   const removeAreaFromCoordinator = async (areaId) => {
@@ -6168,6 +6297,49 @@ function App() {
               <p>Organize técnicos, áreas e coordenadores</p>
             </div>
             <div className="header-actions">
+              {/* Formulário de criação de área */}
+              <div className="area-creation">
+                <div className="form-group-inline">
+                  <input
+                    type="text"
+                    value={newAreaName}
+                    onChange={(e) => {
+                      setNewAreaName(e.target.value);
+                      setCreateAreaError('');
+                    }}
+                    placeholder="Nome da nova área"
+                    className="area-input"
+                    disabled={isCreatingArea}
+                    maxLength={100}
+                  />
+                  <button 
+                    onClick={createNewArea}
+                    className="btn-create-area"
+                    disabled={isCreatingArea || !newAreaName.trim()}
+                    title="Cadastrar nova área"
+                  >
+                    {isCreatingArea ? (
+                      <>
+                        <i className="bi bi-arrow-repeat spin"></i>
+                        Criando...
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-plus-circle"></i>
+                        Cadastrar
+                      </>
+                    )}
+                  </button>
+                </div>
+                {createAreaError && (
+                  <div className="error-message" style={{ fontSize: '12px', marginTop: '4px', color: '#ef4444' }}>
+                    {createAreaError}
+                  </div>
+                )}
+              </div>
+              
+              <div className="header-divider">|</div>
+              
               <button 
                 onClick={openManagementDiagram}
                 className="btn-view-diagram"
@@ -6320,9 +6492,19 @@ function App() {
                           <div className="area-title">
                             <i className="bi bi-diagram-3"></i>
                             <span>{area.nome}</span>
+                            <span className="area-tech-count">{getTecnicosByArea(area.id).length}</span>
                           </div>
                           <div className="area-header-actions">
-                            <span className="area-tech-count">{getTecnicosByArea(area.id).length}</span>
+                            <button 
+                              className="btn-delete-area"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteArea(area.id);
+                              }}
+                              title="Excluir área"
+                            >
+                              <i className="bi bi-trash"></i>
+                            </button>
                           </div>
                         </div>
                         <div className="area-technicians">
@@ -6494,6 +6676,31 @@ function App() {
                     className="btn-confirm"
                   >
                     Confirmar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de erro de exclusão */}
+          {showDeleteErrorModal && (
+            <div className="modal-overlay">
+              <div className="delete-error-modal">
+                <div className="delete-error-header">
+                  <div className="delete-error-icon">
+                    <i className="bi bi-exclamation-circle"></i>
+                  </div>
+                  <h3>Não é possível excluir</h3>
+                </div>
+                <div className="delete-error-content">
+                  <p>{deleteErrorMessage}</p>
+                </div>
+                <div className="delete-error-actions">
+                  <button 
+                    onClick={() => setShowDeleteErrorModal(false)}
+                    className="btn-understand"
+                  >
+                    Entendi
                   </button>
                 </div>
               </div>

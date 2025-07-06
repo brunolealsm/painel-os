@@ -3778,6 +3778,31 @@ body {
   font-weight: 500;
   min-width: 20px;
   text-align: center;
+  margin-left: 8px;
+}
+
+.btn-delete-area {
+  background: none;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  opacity: 0.7;
+}
+
+.btn-delete-area:hover {
+  background: #fef2f2;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.btn-delete-area i {
+  font-size: 14px;
 }
 
 /* Menu de opções das áreas */
@@ -4534,6 +4559,82 @@ body {
 
 .btn-confirm:hover {
   background: #dc2626;
+}
+
+/* Modal de erro de exclusão - Design minimalista */
+.delete-error-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  margin: 0 auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border: 1px solid #f1f5f9;
+  text-align: center;
+}
+
+.delete-error-header {
+  margin-bottom: 20px;
+}
+
+.delete-error-icon {
+  width: 48px;
+  height: 48px;
+  background: #f8fafc;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.delete-error-icon i {
+  font-size: 20px;
+  color: #94a3b8;
+}
+
+.delete-error-header h3 {
+  margin: 0;
+  color: #64748b;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.delete-error-content {
+  margin-bottom: 24px;
+}
+
+.delete-error-content p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.delete-error-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.btn-understand {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-understand:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 /* Responsividade */
