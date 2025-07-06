@@ -1073,13 +1073,26 @@ function App() {
 
   // Função para carregar dados da API
   const loadOrdersFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('📊 PERFORMANCE LOG - Iniciando carregamento de ordens:', startTimestamp);
+    
     setIsLoadingData(true);
     try {
-      console.log('🔄 Carregando dados da API...');
+      console.log('🔄 [1/3] Fazendo requisição para /api/orders/open...');
       const response = await fetch(`${API_BASE_URL}/api/orders/open?t=${Date.now()}`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/3] Requisição completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
+      console.log('🔄 [2/3] Processando resposta JSON...');
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/3] JSON parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/3] Aplicando dados ao estado...');
         console.log(`✅ ${result.total} ordens carregadas da API (${result.dataSource})`);
         console.log('🔍 Dados recebidos da API:', result.data);
         setApiData(result.data);
@@ -1088,6 +1101,10 @@ function App() {
         // Atualizar estado com dados da API
         setAvailableOrdersState(result.data);
         console.log('🔍 availableOrdersState atualizado com:', result.data);
+        
+        const endTime = performance.now();
+        console.log(`⏱️ [3/3] Estado atualizado em: ${(endTime - parseTime).toFixed(2)}ms`);
+        console.log(`🎯 PERFORMANCE TOTAL - Ordens carregadas em: ${(endTime - startTime).toFixed(2)}ms (${((endTime - startTime) / 1000).toFixed(2)}s)`);
       } else {
         console.error('❌ Erro ao carregar dados da API:', result.message);
         // Manter dados mock em caso de erro
@@ -1101,19 +1118,33 @@ function App() {
       setDataSource('mock');
     } finally {
       setIsLoadingData(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de ordens finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
   // Função para carregar técnicos da API
   const loadTechniciansFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('👷‍♂️ PERFORMANCE LOG - Iniciando carregamento de técnicos:', startTimestamp);
+    
     setIsLoadingTechnicians(true);
     setTechniciansError(null);
     try {
-      console.log('🔄 Carregando técnicos da API...');
+      console.log('🔄 [1/3] Fazendo requisição para /api/technicians...');
       const response = await fetch(`${API_BASE_URL}/api/technicians`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/3] Requisição de técnicos completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/3] JSON de técnicos parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/3] Aplicando técnicos ao estado...');
         console.log(`✅ ${result.data.length} técnicos carregados da API`);
         console.log('🔍 Técnicos recebidos da API:', result.data);
         
@@ -1122,6 +1153,10 @@ function App() {
           ...prev,
           tecnicos: result.data
         }));
+        
+        const endTime = performance.now();
+        console.log(`⏱️ [3/3] Estado de técnicos atualizado em: ${(endTime - parseTime).toFixed(2)}ms`);
+        console.log(`🎯 PERFORMANCE TOTAL - Técnicos carregados em: ${(endTime - startTime).toFixed(2)}ms`);
       } else {
         console.error('❌ Erro ao carregar técnicos da API:', result.message);
         setTechniciansError(result.message);
@@ -1131,19 +1166,33 @@ function App() {
       setTechniciansError(`Erro de conexão: ${error.message}`);
     } finally {
       setIsLoadingTechnicians(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de técnicos finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
   // Função para carregar áreas da API
   const loadAreasFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('🏢 PERFORMANCE LOG - Iniciando carregamento de áreas:', startTimestamp);
+    
     setIsLoadingAreas(true);
     setAreasError(null);
     try {
-      console.log('🔄 Carregando áreas da API...');
+      console.log('🔄 [1/3] Fazendo requisição para /api/areas...');
       const response = await fetch(`${API_BASE_URL}/api/areas`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/3] Requisição de áreas completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/3] JSON de áreas parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/3] Aplicando áreas ao estado...');
         console.log(`✅ ${result.data.length} áreas carregadas da API`);
         console.log('🔍 Áreas recebidas da API:', result.data);
         
@@ -1152,6 +1201,10 @@ function App() {
           ...prev,
           areas: result.data
         }));
+        
+        const endTime = performance.now();
+        console.log(`⏱️ [3/3] Estado de áreas atualizado em: ${(endTime - parseTime).toFixed(2)}ms`);
+        console.log(`🎯 PERFORMANCE TOTAL - Áreas carregadas em: ${(endTime - startTime).toFixed(2)}ms`);
       } else {
         console.error('❌ Erro ao carregar áreas da API:', result.message);
         setAreasError(result.message);
@@ -1161,19 +1214,33 @@ function App() {
       setAreasError(`Erro de conexão: ${error.message}`);
     } finally {
       setIsLoadingAreas(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de áreas finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
   // Função para carregar coordenadores da API
   const loadCoordinatorsFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('👨‍💼 PERFORMANCE LOG - Iniciando carregamento de coordenadores:', startTimestamp);
+    
     setIsLoadingCoordinators(true);
     setCoordinatorsError(null);
     try {
-      console.log('🔄 Carregando coordenadores da API...');
+      console.log('🔄 [1/3] Fazendo requisição para /api/coordinators...');
       const response = await fetch(`${API_BASE_URL}/api/coordinators`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/3] Requisição de coordenadores completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/3] JSON de coordenadores parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/3] Aplicando coordenadores ao estado...');
         console.log(`✅ ${result.data.length} coordenadores carregados da API`);
         console.log('🔍 Coordenadores recebidos da API:', result.data);
         
@@ -1182,6 +1249,10 @@ function App() {
           ...prev,
           coordenadores: result.data
         }));
+        
+        const endTime = performance.now();
+        console.log(`⏱️ [3/3] Estado de coordenadores atualizado em: ${(endTime - parseTime).toFixed(2)}ms`);
+        console.log(`🎯 PERFORMANCE TOTAL - Coordenadores carregados em: ${(endTime - startTime).toFixed(2)}ms`);
       } else {
         console.error('❌ Erro ao carregar coordenadores da API:', result.message);
         setCoordinatorsError(result.message);
@@ -1191,21 +1262,37 @@ function App() {
       setCoordinatorsError(`Erro de conexão: ${error.message}`);
     } finally {
       setIsLoadingCoordinators(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de coordenadores finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
   // Função para carregar vínculos técnico-área da API
   const loadAreaTeamFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('🔗 PERFORMANCE LOG - Iniciando carregamento de vínculos técnico-área:', startTimestamp);
+    
     setIsLoadingAreaTeam(true);
     setAreaTeamError(null);
     try {
-      console.log('🔄 Carregando vínculos técnico-área da API...');
+      console.log('🔄 [1/4] Fazendo requisição para /api/areateam...');
       const response = await fetch(`${API_BASE_URL}/api/areateam`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/4] Requisição de vínculos técnico-área completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/4] JSON de vínculos parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/4] Processando vínculos técnico-área...');
         console.log(`✅ ${result.data.length} vínculos técnico-área carregados da API`);
         console.log('🔍 Vínculos recebidos da API:', result.data);
+        
+        const processStart = performance.now();
         
         // Aplicar os vínculos aos técnicos
         setTeamData(prev => {
@@ -1215,7 +1302,8 @@ function App() {
             return prev;
           }
           
-          return {
+          console.log('🔄 [4/4] Aplicando vínculos aos técnicos...');
+          const updatedTeamData = {
             ...prev,
             tecnicos: prev.tecnicos.map(tecnico => {
               const vinculo = result.data.find(v => v.id_tech === tecnico.id);
@@ -1225,6 +1313,12 @@ function App() {
               };
             })
           };
+          
+          const endTime = performance.now();
+          console.log(`⏱️ [4/4] Vínculos aplicados aos técnicos em: ${(endTime - processStart).toFixed(2)}ms`);
+          console.log(`🎯 PERFORMANCE TOTAL - Vínculos técnico-área processados em: ${(endTime - startTime).toFixed(2)}ms`);
+          
+          return updatedTeamData;
         });
       } else {
         console.error('❌ Erro ao carregar vínculos técnico-área da API:', result.message);
@@ -1235,21 +1329,37 @@ function App() {
       setAreaTeamError(`Erro de conexão: ${error.message}`);
     } finally {
       setIsLoadingAreaTeam(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de vínculos técnico-área finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
   // Função para carregar vínculos área-coordenador da API
   const loadAreaCoordFromAPI = useCallback(async () => {
+    const startTime = performance.now();
+    const startTimestamp = new Date().toLocaleTimeString();
+    console.log('🤝 PERFORMANCE LOG - Iniciando carregamento de vínculos área-coordenador:', startTimestamp);
+    
     setIsLoadingAreaCoord(true);
     setAreaCoordError(null);
     try {
-      console.log('🔄 Carregando vínculos área-coordenador da API...');
+      console.log('🔄 [1/4] Fazendo requisição para /api/areacoord...');
       const response = await fetch(`${API_BASE_URL}/api/areacoord`);
+      
+      const fetchTime = performance.now();
+      console.log(`⏱️ [1/4] Requisição de vínculos área-coordenador completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      
       const result = await response.json();
       
+      const parseTime = performance.now();
+      console.log(`⏱️ [2/4] JSON de vínculos parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
+      
       if (result.success) {
+        console.log('🔄 [3/4] Processando vínculos área-coordenador...');
         console.log(`✅ ${result.data.length} vínculos área-coordenador carregados da API`);
         console.log('🔍 Vínculos área-coordenador recebidos da API:', result.data);
+        
+        const processStart = performance.now();
         
         // Aplicar os vínculos às áreas
         setTeamData(prev => {
@@ -1259,7 +1369,8 @@ function App() {
             return prev;
           }
           
-          return {
+          console.log('🔄 [4/4] Aplicando vínculos às áreas...');
+          const updatedTeamData = {
             ...prev,
             areas: prev.areas.map(area => {
               const vinculo = result.data.find(v => v.id_area === area.id);
@@ -1269,6 +1380,12 @@ function App() {
               };
             })
           };
+          
+          const endTime = performance.now();
+          console.log(`⏱️ [4/4] Vínculos aplicados às áreas em: ${(endTime - processStart).toFixed(2)}ms`);
+          console.log(`🎯 PERFORMANCE TOTAL - Vínculos área-coordenador processados em: ${(endTime - startTime).toFixed(2)}ms`);
+          
+          return updatedTeamData;
         });
       } else {
         console.error('❌ Erro ao carregar vínculos área-coordenador da API:', result.message);
@@ -1279,6 +1396,8 @@ function App() {
       setAreaCoordError(`Erro de conexão: ${error.message}`);
     } finally {
       setIsLoadingAreaCoord(false);
+      const totalTime = performance.now() - startTime;
+      console.log(`🏁 PERFORMANCE LOG - Carregamento de vínculos área-coordenador finalizado: ${new Date().toLocaleTimeString()} (Total: ${totalTime.toFixed(2)}ms)`);
     }
   }, []);
 
@@ -1314,18 +1433,39 @@ function App() {
   useEffect(() => {
     if (activeSection === 'Equipe' || activeSection === 'Board') {
       const loadTeamData = async () => {
+        const totalStartTime = performance.now();
+        const totalStartTimestamp = new Date().toLocaleTimeString();
+        console.log('🎯 PERFORMANCE LOG - Iniciando carregamento completo da equipe:', totalStartTimestamp);
+        
         // Carregar técnicos, áreas e coordenadores em paralelo
+        console.log('🔄 ETAPA 1/2: Carregando dados básicos da equipe em paralelo...');
+        const basicDataStart = performance.now();
+        
         await Promise.all([
           loadTechniciansFromAPI(),
           loadAreasFromAPI(),
           loadCoordinatorsFromAPI()
         ]);
         
+        const basicDataEnd = performance.now();
+        console.log(`⏱️ ETAPA 1/2: Dados básicos carregados em: ${(basicDataEnd - basicDataStart).toFixed(2)}ms`);
+        
         // Depois carregar os vínculos para aplicar aos técnicos e áreas
+        console.log('🔄 ETAPA 2/2: Carregando vínculos em paralelo...');
+        const linksDataStart = performance.now();
+        
         await Promise.all([
           loadAreaTeamFromAPI(),
           loadAreaCoordFromAPI()
         ]);
+        
+        const linksDataEnd = performance.now();
+        console.log(`⏱️ ETAPA 2/2: Vínculos carregados em: ${(linksDataEnd - linksDataStart).toFixed(2)}ms`);
+        
+        const totalEndTime = performance.now();
+        console.log(`🏆 PERFORMANCE TOTAL - Carregamento completo da equipe finalizado: ${new Date().toLocaleTimeString()}`);
+        console.log(`📊 TEMPO TOTAL: ${(totalEndTime - totalStartTime).toFixed(2)}ms (${((totalEndTime - totalStartTime) / 1000).toFixed(2)}s)`);
+        console.log(`📈 BREAKDOWN: Dados básicos: ${(basicDataEnd - basicDataStart).toFixed(2)}ms | Vínculos: ${(linksDataEnd - linksDataStart).toFixed(2)}ms`);
       };
       
       loadTeamData();
