@@ -3307,6 +3307,34 @@ body {
   font-weight: 300;
 }
 
+/* Indicadores de carregamento no header */
+.header-loading,
+.header-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.header-loading {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+}
+
+.header-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.header-loading i,
+.header-error i {
+  font-size: 16px;
+}
+
 .team-title h2 {
   margin: 0 0 4px 0;
   color: #1e293b;
@@ -3562,6 +3590,18 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+}
+
+/* Quando não há áreas não vinculadas, a seção de áreas deve ter altura mínima automática */
+.areas-section:has(.empty-state:only-child),
+.areas-section:not(:has(.areas-grid)) {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+/* Quando a seção de áreas está vazia ou com poucos itens, reduzir gap */
+.areas-container:has(.areas-section:not(:has(.areas-grid))) {
+  gap: 12px;
 }
 
 .section-title {

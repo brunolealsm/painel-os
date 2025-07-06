@@ -810,24 +810,30 @@ function App() {
 
   // Estados para área Equipe
   const [teamData, setTeamData] = useState({
-    coordenadores: [
-      { id: 1, nome: 'João Silva', areas: [] },
-      { id: 2, nome: 'Maria Santos', areas: [] },
-      { id: 3, nome: 'Pedro Costa', areas: [] },
-      { id: 4, nome: 'Ana Oliveira', areas: [] }
-    ],
-    areas: [
-      { id: 1, nome: 'Área Norte', coordenadorId: null, tecnicos: [] },
-      { id: 2, nome: 'Área Sul', coordenadorId: null, tecnicos: [] },
-      { id: 3, nome: 'Área Central', coordenadorId: 1, tecnicos: [] }
-    ],
+    coordenadores: [],
+    areas: [],
     tecnicos: []
   });
   
   // Estados para carregar técnicos da API
   const [isLoadingTechnicians, setIsLoadingTechnicians] = useState(false);
   const [techniciansError, setTechniciansError] = useState(null);
-  const [newAreaName, setNewAreaName] = useState('');
+  
+  // Estados para carregar áreas da API
+  const [isLoadingAreas, setIsLoadingAreas] = useState(false);
+  const [areasError, setAreasError] = useState(null);
+  
+  // Estados para carregar coordenadores da API
+  const [isLoadingCoordinators, setIsLoadingCoordinators] = useState(false);
+  const [coordinatorsError, setCoordinatorsError] = useState(null);
+  
+  // Estados para carregar vínculos técnico-área da API
+  const [isLoadingAreaTeam, setIsLoadingAreaTeam] = useState(false);
+  const [areaTeamError, setAreaTeamError] = useState(null);
+  
+  // Estados para carregar vínculos área-coordenador da API
+  const [isLoadingAreaCoord, setIsLoadingAreaCoord] = useState(false);
+  const [areaCoordError, setAreaCoordError] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [draggedItem, setDraggedItem] = useState(null);
@@ -1120,6 +1126,154 @@ function App() {
     }
   }, []);
 
+  // Função para carregar áreas da API
+  const loadAreasFromAPI = useCallback(async () => {
+    setIsLoadingAreas(true);
+    setAreasError(null);
+    try {
+      console.log('🔄 Carregando áreas da API...');
+      const response = await fetch(`${API_BASE_URL}/api/areas`);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${result.data.length} áreas carregadas da API`);
+        console.log('🔍 Áreas recebidas da API:', result.data);
+        
+        // Atualizar apenas as áreas no teamData
+        setTeamData(prev => ({
+          ...prev,
+          areas: result.data
+        }));
+      } else {
+        console.error('❌ Erro ao carregar áreas da API:', result.message);
+        setAreasError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição da API de áreas:', error);
+      setAreasError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsLoadingAreas(false);
+    }
+  }, []);
+
+  // Função para carregar coordenadores da API
+  const loadCoordinatorsFromAPI = useCallback(async () => {
+    setIsLoadingCoordinators(true);
+    setCoordinatorsError(null);
+    try {
+      console.log('🔄 Carregando coordenadores da API...');
+      const response = await fetch(`${API_BASE_URL}/api/coordinators`);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${result.data.length} coordenadores carregados da API`);
+        console.log('🔍 Coordenadores recebidos da API:', result.data);
+        
+        // Atualizar apenas os coordenadores no teamData
+        setTeamData(prev => ({
+          ...prev,
+          coordenadores: result.data
+        }));
+      } else {
+        console.error('❌ Erro ao carregar coordenadores da API:', result.message);
+        setCoordinatorsError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição da API de coordenadores:', error);
+      setCoordinatorsError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsLoadingCoordinators(false);
+    }
+  }, []);
+
+  // Função para carregar vínculos técnico-área da API
+  const loadAreaTeamFromAPI = useCallback(async () => {
+    setIsLoadingAreaTeam(true);
+    setAreaTeamError(null);
+    try {
+      console.log('🔄 Carregando vínculos técnico-área da API...');
+      const response = await fetch(`${API_BASE_URL}/api/areateam`);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${result.data.length} vínculos técnico-área carregados da API`);
+        console.log('🔍 Vínculos recebidos da API:', result.data);
+        
+        // Aplicar os vínculos aos técnicos
+        setTeamData(prev => {
+          // Verificar se os técnicos já foram carregados
+          if (prev.tecnicos.length === 0) {
+            console.log('⚠️ Técnicos ainda não carregados, não aplicando vínculos');
+            return prev;
+          }
+          
+          return {
+            ...prev,
+            tecnicos: prev.tecnicos.map(tecnico => {
+              const vinculo = result.data.find(v => v.id_tech === tecnico.id);
+              return {
+                ...tecnico,
+                areaId: vinculo ? vinculo.id_area : null
+              };
+            })
+          };
+        });
+      } else {
+        console.error('❌ Erro ao carregar vínculos técnico-área da API:', result.message);
+        setAreaTeamError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição da API de vínculos técnico-área:', error);
+      setAreaTeamError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsLoadingAreaTeam(false);
+    }
+  }, []);
+
+  // Função para carregar vínculos área-coordenador da API
+  const loadAreaCoordFromAPI = useCallback(async () => {
+    setIsLoadingAreaCoord(true);
+    setAreaCoordError(null);
+    try {
+      console.log('🔄 Carregando vínculos área-coordenador da API...');
+      const response = await fetch(`${API_BASE_URL}/api/areacoord`);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${result.data.length} vínculos área-coordenador carregados da API`);
+        console.log('🔍 Vínculos área-coordenador recebidos da API:', result.data);
+        
+        // Aplicar os vínculos às áreas
+        setTeamData(prev => {
+          // Verificar se as áreas já foram carregadas
+          if (prev.areas.length === 0) {
+            console.log('⚠️ Áreas ainda não carregadas, não aplicando vínculos');
+            return prev;
+          }
+          
+          return {
+            ...prev,
+            areas: prev.areas.map(area => {
+              const vinculo = result.data.find(v => v.id_area === area.id);
+              return {
+                ...area,
+                coordenadorId: vinculo ? vinculo.id_coordinator : null
+              };
+            })
+          };
+        });
+      } else {
+        console.error('❌ Erro ao carregar vínculos área-coordenador da API:', result.message);
+        setAreaCoordError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição da API de vínculos área-coordenador:', error);
+      setAreaCoordError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsLoadingAreaCoord(false);
+    }
+  }, []);
+
   // Carregar dados iniciais e configuração salva
   useEffect(() => {
     // Carregar configuração salva do localStorage
@@ -1148,12 +1302,27 @@ function App() {
     }
   }, [connectionStatus, loadOrdersFromAPI]);
 
-  // Carregar técnicos quando navegar para a seção Equipe
+  // Carregar técnicos, áreas e coordenadores quando navegar para a seção Equipe
   useEffect(() => {
     if (activeSection === 'Equipe') {
-      loadTechniciansFromAPI();
+      const loadTeamData = async () => {
+        // Carregar técnicos, áreas e coordenadores em paralelo
+        await Promise.all([
+          loadTechniciansFromAPI(),
+          loadAreasFromAPI(),
+          loadCoordinatorsFromAPI()
+        ]);
+        
+        // Depois carregar os vínculos para aplicar aos técnicos e áreas
+        await Promise.all([
+          loadAreaTeamFromAPI(),
+          loadAreaCoordFromAPI()
+        ]);
+      };
+      
+      loadTeamData();
     }
-  }, [activeSection, loadTechniciansFromAPI]);
+  }, [activeSection, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI]);
 
   // Função para mapear tipo de serviço baseado em TB02115_PREVENTIVA
   const getServiceTypeFromPreventiva = (preventiva) => {
@@ -1940,23 +2109,6 @@ function App() {
   };
 
   // Funções para área Equipe
-  const handleCreateArea = () => {
-    if (!newAreaName.trim()) return;
-    
-    const newArea = {
-      id: Math.max(...teamData.areas.map(a => a.id)) + 1,
-      nome: newAreaName.trim(),
-      coordenadorId: null,
-      tecnicos: []
-    };
-    
-    setTeamData(prev => ({
-      ...prev,
-      areas: [...prev.areas, newArea]
-    }));
-    
-    setNewAreaName('');
-  };
 
   const handleDragStart = (item, type) => {
     setDraggedItem(item);
@@ -1976,13 +2128,38 @@ function App() {
       if (tecnico.areaId === targetId) return; // Já está na área
       
       actionDescription = `Vincular "${tecnico.nome}" à área "${area.nome}"?`;
-      actionFunction = () => {
-        setTeamData(prev => ({
-          ...prev,
-          tecnicos: prev.tecnicos.map(t => 
-            t.id === draggedItem.id ? { ...t, areaId: targetId } : t
-          )
-        }));
+      actionFunction = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/areateam`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id_tech: tecnico.id,
+              id_area: targetId
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            console.log('✅ Técnico vinculado à área com sucesso');
+            // Atualizar o estado local
+            setTeamData(prev => ({
+              ...prev,
+              tecnicos: prev.tecnicos.map(t => 
+                t.id === draggedItem.id ? { ...t, areaId: targetId } : t
+              )
+            }));
+          } else {
+            console.error('❌ Erro ao vincular técnico à área:', result.message);
+            alert(`Erro ao vincular técnico: ${result.message}`);
+          }
+        } catch (error) {
+          console.error('❌ Erro na requisição de vínculo:', error);
+          alert(`Erro de conexão: ${error.message}`);
+        }
       };
     } else if (draggedType === 'area' && targetType === 'coordenador') {
       const area = teamData.areas.find(a => a.id === draggedItem.id);
@@ -1991,13 +2168,38 @@ function App() {
       if (area.coordenadorId === targetId) return; // Já está com o coordenador
       
       actionDescription = `Vincular área "${area.nome}" ao coordenador "${coordenador.nome}"?`;
-      actionFunction = () => {
-        setTeamData(prev => ({
-          ...prev,
-          areas: prev.areas.map(a => 
-            a.id === draggedItem.id ? { ...a, coordenadorId: targetId } : a
-          )
-        }));
+      actionFunction = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/areacoord`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id_area: area.id,
+              id_coordinator: targetId
+            })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            console.log('✅ Área vinculada ao coordenador com sucesso');
+            // Atualizar o estado local
+            setTeamData(prev => ({
+              ...prev,
+              areas: prev.areas.map(a => 
+                a.id === draggedItem.id ? { ...a, coordenadorId: targetId } : a
+              )
+            }));
+          } else {
+            console.error('❌ Erro ao vincular área ao coordenador:', result.message);
+            alert(`Erro ao vincular área: ${result.message}`);
+          }
+        } catch (error) {
+          console.error('❌ Erro na requisição de vínculo área-coordenador:', error);
+          alert(`Erro de conexão: ${error.message}`);
+        }
       };
     }
 
@@ -2013,9 +2215,9 @@ function App() {
     setDraggedType(null);
   };
 
-  const confirmDragAction = () => {
+  const confirmDragAction = async () => {
     if (confirmAction) {
-      confirmAction.action();
+      await confirmAction.action();
     }
     setShowConfirmModal(false);
     setConfirmAction(null);
@@ -2049,66 +2251,61 @@ function App() {
   };
 
   // Função para remover técnico de uma área
-  const removeTechnicianFromArea = (technicianId) => {
-    setTeamData(prev => ({
-      ...prev,
-      tecnicos: prev.tecnicos.map(t => 
-        t.id === technicianId ? { ...t, areaId: null } : t
-      )
-    }));
-  };
-
-  // Função para editar nome da área
-  const startEditingArea = (areaId, currentName) => {
-    setEditingAreaId(areaId);
-    setEditingAreaName(currentName);
-    setAreaOptionsMenus({});
-  };
-
-  const saveAreaEdit = () => {
-    if (editingAreaName.trim()) {
-      setTeamData(prev => ({
-        ...prev,
-        areas: prev.areas.map(a => 
-          a.id === editingAreaId ? { ...a, nome: editingAreaName.trim() } : a
-        )
-      }));
-    }
-    setEditingAreaId(null);
-    setEditingAreaName('');
-  };
-
-  const cancelAreaEdit = () => {
-    setEditingAreaId(null);
-    setEditingAreaName('');
-  };
-
-  // Função para excluir área
-  const deleteArea = (areaId) => {
-    setConfirmAction({
-      description: 'Tem certeza que deseja excluir esta área? Todos os técnicos vinculados ficarão sem área.',
-      action: () => {
+  const removeTechnicianFromArea = async (technicianId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/areateam/${technicianId}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Técnico removido da área com sucesso');
+        // Atualizar o estado local
         setTeamData(prev => ({
           ...prev,
-          areas: prev.areas.filter(a => a.id !== areaId),
           tecnicos: prev.tecnicos.map(t => 
-            t.areaId === areaId ? { ...t, areaId: null } : t
+            t.id === technicianId ? { ...t, areaId: null } : t
           )
         }));
+      } else {
+        console.error('❌ Erro ao remover técnico da área:', result.message);
+        alert(`Erro ao remover técnico: ${result.message}`);
       }
-    });
-    setShowConfirmModal(true);
-    setAreaOptionsMenus({});
+    } catch (error) {
+      console.error('❌ Erro na requisição de remoção:', error);
+      alert(`Erro de conexão: ${error.message}`);
+    }
   };
 
+
+
   // Função para desvincular área do coordenador
-  const removeAreaFromCoordinator = (areaId) => {
-    setTeamData(prev => ({
-      ...prev,
-      areas: prev.areas.map(a => 
-        a.id === areaId ? { ...a, coordenadorId: null } : a
-      )
-    }));
+  const removeAreaFromCoordinator = async (areaId) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/areacoord/${areaId}`, {
+        method: 'DELETE',
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Área desvinculada do coordenador com sucesso');
+        // Atualizar o estado local
+        setTeamData(prev => ({
+          ...prev,
+          areas: prev.areas.map(a => 
+            a.id === areaId ? { ...a, coordenadorId: null } : a
+          )
+        }));
+      } else {
+        console.error('❌ Erro ao desvincular área do coordenador:', result.message);
+        alert(`Erro ao desvincular área: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição de remoção de vínculo área-coordenador:', error);
+      alert(`Erro de conexão: ${error.message}`);
+    }
     setAreaActionMenus({});
   };
 
@@ -5979,28 +6176,26 @@ function App() {
                 Visualizar gestão
               </button>
               
-              <div className="header-divider">|</div>
+              {/* Status de carregamento das áreas */}
+              {isLoadingAreas && (
+                <>
+                  <div className="header-divider">|</div>
+                  <div className="header-loading">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>Carregando áreas...</span>
+                  </div>
+                </>
+              )}
               
-              <div className="area-creation">
-                <div className="form-group-inline">
-                  <input
-                    type="text"
-                    placeholder="Nome da nova área"
-                    value={newAreaName}
-                    onChange={(e) => setNewAreaName(e.target.value)}
-                    className="area-input"
-                    onKeyPress={(e) => e.key === 'Enter' && handleCreateArea()}
-                  />
-                  <button 
-                    onClick={handleCreateArea}
-                    className="btn-create-area"
-                    disabled={!newAreaName.trim()}
-                  >
-                    <i className="bi bi-plus-circle"></i>
-                    Criar Área
-                  </button>
-                </div>
-              </div>
+              {areasError && (
+                <>
+                  <div className="header-divider">|</div>
+                  <div className="header-error">
+                    <i className="bi bi-exclamation-triangle"></i>
+                    <span>Erro ao carregar áreas</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -6088,7 +6283,24 @@ function App() {
                 <div className="section-title-clean">
                   <h3>Áreas <span className="section-count-inline">({getUnassignedAreas().length})</span></h3>
                 </div>
-                {getUnassignedAreas().length > 0 ? (
+                
+                {/* Indicador de carregamento das áreas */}
+                {isLoadingAreas && (
+                  <div className="loading-indicator">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>Carregando áreas...</span>
+                  </div>
+                )}
+                
+                {/* Mensagem de erro */}
+                {areasError && (
+                  <div className="error-message">
+                    <i className="bi bi-exclamation-triangle"></i>
+                    <span>Erro: {areasError}</span>
+                  </div>
+                )}
+                
+                {!isLoadingAreas && !areasError && getUnassignedAreas().length > 0 ? (
                   <div className="areas-grid">
                     {getUnassignedAreas().map(area => (
                       <div
@@ -6107,62 +6319,10 @@ function App() {
                         >
                           <div className="area-title">
                             <i className="bi bi-diagram-3"></i>
-                            {editingAreaId === area.id ? (
-                              <div className="area-edit-form">
-                                <input
-                                  type="text"
-                                  value={editingAreaName}
-                                  onChange={(e) => setEditingAreaName(e.target.value)}
-                                  className="area-edit-input"
-                                  onKeyPress={(e) => e.key === 'Enter' && saveAreaEdit()}
-                                  autoFocus
-                                />
-                                <div className="area-edit-actions">
-                                  <button onClick={saveAreaEdit} className="btn-save">
-                                    <i className="bi bi-check"></i>
-                                  </button>
-                                  <button onClick={cancelAreaEdit} className="btn-cancel">
-                                    <i className="bi bi-x"></i>
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <span>{area.nome}</span>
-                            )}
+                            <span>{area.nome}</span>
                           </div>
                           <div className="area-header-actions">
                             <span className="area-tech-count">{getTecnicosByArea(area.id).length}</span>
-                            {editingAreaId !== area.id && (
-                              <div className="area-options-container">
-                                <button 
-                                  className="area-options-btn"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleAreaOptionsMenu(area.id);
-                                  }}
-                                >
-                                  <i className="bi bi-three-dots"></i>
-                                </button>
-                                {areaOptionsMenus[area.id] && (
-                                  <div className="area-options-menu">
-                                    <button 
-                                      onClick={() => startEditingArea(area.id, area.nome)}
-                                      className="options-menu-item"
-                                    >
-                                      <i className="bi bi-pencil"></i>
-                                      Alterar nome
-                                    </button>
-                                    <button 
-                                      onClick={() => deleteArea(area.id)}
-                                      className="options-menu-item delete"
-                                    >
-                                      <i className="bi bi-trash"></i>
-                                      Excluir área
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         </div>
                         <div className="area-technicians">
@@ -6191,102 +6351,39 @@ function App() {
                       </div>
                     ))}
                   </div>
-                ) : (
-                  // Quando não há áreas, mostrar coordenadores logo abaixo
-                  <div className="coordinators-section">
-                    <div className="section-title-clean">
-                      <h3>Coordenadores <span className="section-count-inline">({teamData.coordenadores.length})</span></h3>
-                    </div>
-                    <div className="coordinators-grid">
-                      {teamData.coordenadores.map(coordenador => {
-                        const areas = getAreasByCoordinator(coordenador.id);
-                        const totalTecnicos = areas.reduce((sum, area) => sum + getTecnicosByArea(area.id).length, 0);
-                        
-                        return (
-                          <div
-                            key={coordenador.id}
-                            className="coordinator-card"
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              handleDrop(coordenador.id, 'coordenador');
-                            }}
-                            onDragOver={(e) => e.preventDefault()}
-                          >
-                            <div className="coordinator-header">
-                              <div className="coordinator-info">
-                                <i className="bi bi-person-badge"></i>
-                                <div>
-                                  <h4>{coordenador.nome}</h4>
-                                  <span className="coordinator-stats">
-                                    {areas.length} área{areas.length !== 1 ? 's' : ''} • {totalTecnicos} técnico{totalTecnicos !== 1 ? 's' : ''}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="coordinator-areas">
-                              {areas.map(area => (
-                                <div key={area.id} className="coordinator-area-item">
-                                  <div className="area-name">
-                                    <div className="area-name-content">
-                                      <i className="bi bi-diagram-3-fill"></i>
-                                      <span>{area.nome}</span>
-                                      <span className="area-tech-badge">{getTecnicosByArea(area.id).length}</span>
-                                    </div>
-                                    <div className="area-action-container">
-                                      <button 
-                                        className="area-action-btn"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleAreaActionMenu(area.id);
-                                        }}
-                                      >
-                                        <i className="bi bi-three-dots"></i>
-                                      </button>
-                                      {areaActionMenus[area.id] && (
-                                        <div className="area-action-menu">
-                                          <button 
-                                            onClick={() => removeAreaFromCoordinator(area.id)}
-                                            className="action-menu-item"
-                                          >
-                                            <i className="bi bi-arrow-up"></i>
-                                            Configurar área
-                                          </button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="area-technicians-list">
-                                    {getTecnicosByArea(area.id).map(tecnico => (
-                                      <span key={tecnico.id} className="tech-tag">
-                                        <TechnicianName name={tecnico.nome} maxLength={20} />
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                              {areas.length === 0 && (
-                                <div className="coordinator-drop-zone">
-                                  <i className="bi bi-arrow-down-circle"></i>
-                                  <span>Arraste áreas aqui</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                ) : !isLoadingAreas && !areasError ? (
+                  <div className="empty-state">
+                    <i className="bi bi-diagram-3"></i>
+                    <span>Nenhuma área cadastrada</span>
                   </div>
-                )}
+                ) : null}
               </div>
 
-              {/* Coordenadores com suas áreas - só aparece quando há áreas */}
-              {getUnassignedAreas().length > 0 && (
-                <div className="coordinators-section">
+              {/* Coordenadores com suas áreas */}
+              <div className="coordinators-section">
                 <div className="section-title-clean">
                   <h3>Coordenadores <span className="section-count-inline">({teamData.coordenadores.length})</span></h3>
                 </div>
-                <div className="coordinators-grid">
-                  {teamData.coordenadores.map(coordenador => {
+                
+                {/* Indicador de carregamento dos coordenadores */}
+                {isLoadingCoordinators && (
+                  <div className="loading-indicator">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>Carregando coordenadores...</span>
+                  </div>
+                )}
+                
+                {/* Mensagem de erro */}
+                {coordinatorsError && (
+                  <div className="error-message">
+                    <i className="bi bi-exclamation-triangle"></i>
+                    <span>Erro: {coordinatorsError}</span>
+                  </div>
+                )}
+                
+                {!isLoadingCoordinators && !coordinatorsError && teamData.coordenadores.length > 0 && (
+                  <div className="coordinators-grid">
+                    {teamData.coordenadores.map(coordenador => {
                     const areas = getAreasByCoordinator(coordenador.id);
                     const totalTecnicos = areas.reduce((sum, area) => sum + getTecnicosByArea(area.id).length, 0);
                     
@@ -6346,7 +6443,7 @@ function App() {
                               <div className="area-technicians-list">
                                 {getTecnicosByArea(area.id).map(tecnico => (
                                   <span key={tecnico.id} className="tech-tag">
-                                    {tecnico.nome}
+                                    <TechnicianName name={tecnico.nome} maxLength={20} />
                                   </span>
                                 ))}
                               </div>
@@ -6362,9 +6459,16 @@ function App() {
                       </div>
                     );
                   })}
-                </div>
+                  </div>
+                )}
+                
+                {!isLoadingCoordinators && !coordinatorsError && teamData.coordenadores.length === 0 && (
+                  <div className="empty-state">
+                    <i className="bi bi-person-badge"></i>
+                    <span>Nenhum coordenador cadastrado</span>
+                  </div>
+                )}
               </div>
-            )}
             </div>
           </div>
 
