@@ -381,6 +381,349 @@ const DatabaseConfig = ({
   );
 };
 
+// Componente de gerenciamento de usuários
+const UserManagement = ({
+  users,
+  setUsers,
+  isLoadingUsers,
+  setIsLoadingUsers,
+  showUserForm,
+  setShowUserForm,
+  editingUser,
+  setEditingUser,
+  showPasswordUser,
+  setShowPasswordUser,
+  userFormData,
+  setUserFormData,
+  userFormErrors,
+  setUserFormErrors
+}) => {
+  
+  // Função para carregar usuários
+  const loadUsers = async () => {
+    setIsLoadingUsers(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setUsers(result.users);
+      } else {
+        console.error('Erro ao carregar usuários:', result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar usuários:', error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  // Carregar usuários ao montar o componente
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  // Função para abrir formulário de novo usuário
+  const handleNewUser = () => {
+    setUserFormData({
+      user: '',
+      password: '',
+      type: 'Usuário',
+      coordinator: false,
+      blacktheme: false
+    });
+    setEditingUser(null);
+    setUserFormErrors({});
+    setShowUserForm(true);
+  };
+
+  // Função para editar usuário
+  const handleEditUser = (user) => {
+    setUserFormData({
+      user: user.user,
+      password: '',
+      type: user.type,
+      coordinator: user.coordinator,
+      blacktheme: user.blacktheme
+    });
+    setEditingUser(user);
+    setUserFormErrors({});
+    setShowUserForm(true);
+  };
+
+  // Função para excluir usuário
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Deseja realmente excluir este usuário?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        method: 'DELETE'
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        loadUsers(); // Recarregar lista
+        alert('Usuário excluído com sucesso!');
+      } else {
+        alert('Erro ao excluir usuário: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
+      alert('Erro ao excluir usuário');
+    }
+  };
+
+  // Função para alterar campos do formulário
+  const handleFormChange = (field, value) => {
+    setUserFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Limpar erro do campo
+    if (userFormErrors[field]) {
+      setUserFormErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+  };
+
+  // Função para salvar usuário
+  const handleSaveUser = async () => {
+    const errors = {};
+    
+    // Validações
+    if (!userFormData.user.trim()) {
+      errors.user = 'Nome do usuário é obrigatório';
+    }
+    
+    if (!userFormData.password || userFormData.password.length < 4) {
+      errors.password = 'Senha deve ter no mínimo 4 caracteres';
+    }
+    
+    if (Object.keys(errors).length > 0) {
+      setUserFormErrors(errors);
+      return;
+    }
+
+    try {
+      const method = editingUser ? 'PUT' : 'POST';
+      const url = editingUser 
+        ? `${API_BASE_URL}/api/users/${editingUser.id}` 
+        : `${API_BASE_URL}/api/users`;
+      
+      const response = await fetch(url, {
+        method: method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userFormData)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setShowUserForm(false);
+        loadUsers(); // Recarregar lista
+        alert(editingUser ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!');
+      } else {
+        alert('Erro ao salvar usuário: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao salvar usuário:', error);
+      alert('Erro ao salvar usuário');
+    }
+  };
+
+  return (
+    <div className="user-management">
+      <div className="user-management-header">
+        <h3 className="config-title">Gerenciamento de Usuários</h3>
+        <button 
+          className="btn-new-user"
+          onClick={handleNewUser}
+        >
+          + Novo Usuário
+        </button>
+      </div>
+
+      {isLoadingUsers ? (
+        <div className="loading-users">Carregando usuários...</div>
+      ) : (
+        <div className="users-table-container">
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome de Usuário</th>
+                <th>Tipo</th>
+                <th>Coordenador</th>
+                <th>Tema Escuro</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(user => (
+                <tr key={user.id}>
+                  <td>{user.id}</td>
+                  <td>{user.user}</td>
+                  <td>
+                    <span className={`user-type-badge ${user.type === 'Administrador' ? 'admin' : 'user'}`}>
+                      {user.type}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${user.coordinator ? 'yes' : 'no'}`}>
+                      {user.coordinator ? 'Sim' : 'Não'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`status-badge ${user.blacktheme ? 'yes' : 'no'}`}>
+                      {user.blacktheme ? 'Sim' : 'Não'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="user-actions">
+                      <button 
+                        className="btn-edit"
+                        onClick={() => handleEditUser(user)}
+                        title="Editar usuário"
+                      >
+                        ✏️
+                      </button>
+                      <button 
+                        className="btn-delete"
+                        onClick={() => handleDeleteUser(user.id)}
+                        title="Excluir usuário"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          
+          {users.length === 0 && (
+            <div className="no-users">
+              Nenhum usuário encontrado
+            </div>
+          )}
+        </div>
+      )}
+
+      {showUserForm && (
+        <div className="user-form-overlay">
+          <div className="user-form">
+            <div className="user-form-header">
+              <h4>{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</h4>
+              <button 
+                className="btn-close"
+                onClick={() => setShowUserForm(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="user-form-content">
+              <div className="form-group">
+                <label>Nome do Usuário *</label>
+                <input
+                  type="text"
+                  value={userFormData.user}
+                  onChange={(e) => handleFormChange('user', e.target.value)}
+                  className={`form-input ${userFormErrors.user ? 'error' : ''}`}
+                  placeholder="Digite o nome do usuário"
+                />
+                {userFormErrors.user && (
+                  <span className="error-message">{userFormErrors.user}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Senha *</label>
+                <div className="password-input-container">
+                  <input
+                    type={showPasswordUser ? 'text' : 'password'}
+                    value={userFormData.password}
+                    onChange={(e) => handleFormChange('password', e.target.value)}
+                    className={`form-input ${userFormErrors.password ? 'error' : ''}`}
+                    placeholder="Digite a senha (mínimo 4 caracteres)"
+                  />
+                  <button 
+                    type="button"
+                    className="btn-show-password"
+                    onClick={() => setShowPasswordUser(!showPasswordUser)}
+                  >
+                    {showPasswordUser ? '🙈' : '👁️'}
+                  </button>
+                </div>
+                {userFormErrors.password && (
+                  <span className="error-message">{userFormErrors.password}</span>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Tipo de Usuário *</label>
+                <select
+                  value={userFormData.type}
+                  onChange={(e) => handleFormChange('type', e.target.value)}
+                  className="form-select"
+                >
+                  <option value="Usuário">Usuário</option>
+                  <option value="Administrador">Administrador</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={userFormData.coordinator}
+                    onChange={(e) => handleFormChange('coordinator', e.target.checked)}
+                  />
+                  <span className="checkbox-text">Coordenador</span>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={userFormData.blacktheme}
+                    onChange={(e) => handleFormChange('blacktheme', e.target.checked)}
+                  />
+                  <span className="checkbox-text">Tema Escuro</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="user-form-actions">
+              <button 
+                className="btn-cancel"
+                onClick={() => setShowUserForm(false)}
+              >
+                Cancelar
+              </button>
+              <button 
+                className="btn-save"
+                onClick={handleSaveUser}
+              >
+                {editingUser ? 'Atualizar' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 function App() {
   const [activeSection, setActiveSection] = useState('Board');
   const [activeFilters, setActiveFilters] = useState({
@@ -680,6 +1023,21 @@ function App() {
   const [connectionStatus, setConnectionStatus] = useState(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionTested, setConnectionTested] = useState(false);
+
+  // Estados para gerenciamento de usuários
+  const [users, setUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showPasswordUser, setShowPasswordUser] = useState(null);
+  const [userFormData, setUserFormData] = useState({
+    user: '',
+    password: '',
+    type: 'Usuário',
+    coordinator: false,
+    blacktheme: false
+  });
+  const [userFormErrors, setUserFormErrors] = useState({});
 
   // Função para carregar dados da API
   const loadOrdersFromAPI = useCallback(async () => {
@@ -5320,6 +5678,12 @@ function App() {
             >
               Banco de dados
             </button>
+            <button 
+              className={`config-nav-item ${activeConfigSection === 'users' ? 'active' : ''}`}
+              onClick={() => setActiveConfigSection('users')}
+            >
+              Usuários
+            </button>
           </div>
         </div>
       )}
@@ -5335,6 +5699,27 @@ function App() {
             setIsTestingConnection={setIsTestingConnection}
             connectionTested={connectionTested}
             setConnectionTested={setConnectionTested}
+          />
+        </div>
+      )}
+
+      {showConfigMenu && activeConfigSection === 'users' && (
+        <div className="config-content">
+          <UserManagement 
+            users={users}
+            setUsers={setUsers}
+            isLoadingUsers={isLoadingUsers}
+            setIsLoadingUsers={setIsLoadingUsers}
+            showUserForm={showUserForm}
+            setShowUserForm={setShowUserForm}
+            editingUser={editingUser}
+            setEditingUser={setEditingUser}
+            showPasswordUser={showPasswordUser}
+            setShowPasswordUser={setShowPasswordUser}
+            userFormData={userFormData}
+            setUserFormData={setUserFormData}
+            userFormErrors={userFormErrors}
+            setUserFormErrors={setUserFormErrors}
           />
         </div>
       )}
