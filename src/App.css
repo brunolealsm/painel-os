@@ -3490,10 +3490,21 @@ body {
   font-size: 14px;
 }
 
-/* Técnicos com altura reduzida em 20% */
+/* Técnicos com altura reduzida em 40% */
 .team-item.compact {
-  padding: 9.6px 12px; /* Redução de 20% no padding vertical */
-  min-height: 36px; /* Altura mínima reduzida */
+  padding: 5.76px 12px; /* Redução de 40% no padding vertical (12px * 0.6) */
+  min-height: 21.6px; /* Altura mínima reduzida em 40% (36px * 0.6) */
+  gap: 6px; /* Reduzido de 8px para 6px */
+}
+
+/* Fonte dos nomes dos técnicos na seção disponíveis */
+.team-item.compact .technician-name {
+  font-size: 10px;
+}
+
+/* Ícone dos técnicos na seção disponíveis */
+.team-item.compact i {
+  font-size: 12px; /* Reduzido de 16px para 12px */
 }
 
 .team-item:hover {
@@ -4998,6 +5009,101 @@ body {
   .user-form-actions .btn-save {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Estilos para nomes de técnicos com tooltip */
+.technician-name {
+  position: relative;
+  display: inline-block;
+  cursor: default;
+}
+
+.technician-name.truncated {
+  cursor: help;
+}
+
+.technician-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d3748;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  margin-bottom: 4px;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeInTooltip 0.3s ease-out forwards;
+}
+
+.technician-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #2d3748;
+}
+
+/* Indicadores de carregamento e erro específicos para equipe */
+.team-column .loading-indicator, 
+.team-column .error-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 8px;
+  text-align: center;
+  justify-content: center;
+}
+
+.team-column .loading-indicator {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e40af;
+}
+
+.team-column .error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+}
+
+.team-column .loading-indicator i,
+.team-column .error-message i {
+  font-size: 16px;
+}
+
+/* Animação de rotação para ícone de carregamento */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Garantir que o tooltip não seja cortado */
+.team-item, .area-tech-item, .tech-tag {
+  position: relative;
+  overflow: visible;
+}
+
+/* Melhorar a aparência do tooltip em dispositivos móveis */
+@media (max-width: 768px) {
+  .technician-tooltip {
+    font-size: 11px;
+    padding: 4px 8px;
   }
 }
 

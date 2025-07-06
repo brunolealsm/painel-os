@@ -381,6 +381,29 @@ const DatabaseConfig = ({
   );
 };
 
+// Componente para mostrar nome de técnico com tooltip se necessário
+const TechnicianName = ({ name, maxLength = 25 }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const shouldTruncate = name.length > maxLength;
+  const truncatedName = shouldTruncate ? `${name.substring(0, maxLength)}...` : name;
+  
+  return (
+    <span 
+      className={`technician-name ${shouldTruncate ? 'truncated' : ''}`}
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+      title={shouldTruncate ? name : undefined}
+    >
+      {truncatedName}
+      {shouldTruncate && showTooltip && (
+        <div className="technician-tooltip">
+          {name}
+        </div>
+      )}
+    </span>
+  );
+};
+
 // Componente de gerenciamento de usuários
 const UserManagement = ({
   users,
@@ -798,17 +821,12 @@ function App() {
       { id: 2, nome: 'Área Sul', coordenadorId: null, tecnicos: [] },
       { id: 3, nome: 'Área Central', coordenadorId: 1, tecnicos: [] }
     ],
-    tecnicos: [
-      { id: 1, nome: 'Carlos Mendes', areaId: null },
-      { id: 2, nome: 'Ana Paula', areaId: null },
-      { id: 3, nome: 'Roberto Lima', areaId: 3 },
-      { id: 4, nome: 'Fernanda Costa', areaId: null },
-      { id: 5, nome: 'Lucas Oliveira', areaId: null },
-      { id: 6, nome: 'Juliana Santos', areaId: null },
-      { id: 7, nome: 'Ricardo Alves', areaId: 3 },
-      { id: 8, nome: 'Patricia Silva', areaId: null }
-    ]
+    tecnicos: []
   });
+  
+  // Estados para carregar técnicos da API
+  const [isLoadingTechnicians, setIsLoadingTechnicians] = useState(false);
+  const [techniciansError, setTechniciansError] = useState(null);
   const [newAreaName, setNewAreaName] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -1072,6 +1090,36 @@ function App() {
     }
   }, []);
 
+  // Função para carregar técnicos da API
+  const loadTechniciansFromAPI = useCallback(async () => {
+    setIsLoadingTechnicians(true);
+    setTechniciansError(null);
+    try {
+      console.log('🔄 Carregando técnicos da API...');
+      const response = await fetch(`${API_BASE_URL}/api/technicians`);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ ${result.data.length} técnicos carregados da API`);
+        console.log('🔍 Técnicos recebidos da API:', result.data);
+        
+        // Atualizar apenas os técnicos no teamData
+        setTeamData(prev => ({
+          ...prev,
+          tecnicos: result.data
+        }));
+      } else {
+        console.error('❌ Erro ao carregar técnicos da API:', result.message);
+        setTechniciansError(result.message);
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição da API de técnicos:', error);
+      setTechniciansError(`Erro de conexão: ${error.message}`);
+    } finally {
+      setIsLoadingTechnicians(false);
+    }
+  }, []);
+
   // Carregar dados iniciais e configuração salva
   useEffect(() => {
     // Carregar configuração salva do localStorage
@@ -1099,6 +1147,13 @@ function App() {
       }, 1000); // Aguardar 1 segundo para o backend processar
     }
   }, [connectionStatus, loadOrdersFromAPI]);
+
+  // Carregar técnicos quando navegar para a seção Equipe
+  useEffect(() => {
+    if (activeSection === 'Equipe') {
+      loadTechniciansFromAPI();
+    }
+  }, [activeSection, loadTechniciansFromAPI]);
 
   // Função para mapear tipo de serviço baseado em TB02115_PREVENTIVA
   const getServiceTypeFromPreventiva = (preventiva) => {
@@ -5981,7 +6036,24 @@ function App() {
               </div>
               
               <div className="team-column-content">
-                {getFilteredUnassignedTechnicians().map(tecnico => (
+                {/* Indicador de carregamento */}
+                {isLoadingTechnicians && (
+                  <div className="loading-indicator">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>Carregando técnicos...</span>
+                  </div>
+                )}
+                
+                {/* Mensagem de erro */}
+                {techniciansError && (
+                  <div className="error-message">
+                    <i className="bi bi-exclamation-triangle"></i>
+                    <span>Erro: {techniciansError}</span>
+                  </div>
+                )}
+                
+                {/* Lista de técnicos */}
+                {!isLoadingTechnicians && !techniciansError && getFilteredUnassignedTechnicians().map(tecnico => (
                   <div
                     key={tecnico.id}
                     className="team-item tecnico-item compact"
@@ -5989,16 +6061,18 @@ function App() {
                     onDragStart={() => handleDragStart(tecnico, 'tecnico')}
                   >
                     <i className="bi bi-person"></i>
-                    <span>{tecnico.nome}</span>
+                    <TechnicianName name={tecnico.nome} maxLength={25} />
                   </div>
                 ))}
-                {getFilteredUnassignedTechnicians().length === 0 && technicianSearchTerm && (
+                
+                {/* Estados vazios */}
+                {!isLoadingTechnicians && !techniciansError && getFilteredUnassignedTechnicians().length === 0 && technicianSearchTerm && (
                   <div className="empty-state">
                     <i className="bi bi-search"></i>
                     <span>Nenhum técnico encontrado</span>
                   </div>
                 )}
-                {getUnassignedTechnicians().length === 0 && !technicianSearchTerm && (
+                {!isLoadingTechnicians && !techniciansError && getUnassignedTechnicians().length === 0 && !technicianSearchTerm && (
                   <div className="empty-state">
                     <i className="bi bi-check-circle"></i>
                     <span>Todos os técnicos estão vinculados</span>
@@ -6096,7 +6170,7 @@ function App() {
                             <div key={tecnico.id} className="area-tech-item">
                               <div className="tech-info">
                                 <i className="bi bi-person-fill"></i>
-                                <span>{tecnico.nome}</span>
+                                <TechnicianName name={tecnico.nome} maxLength={25} />
                               </div>
                               <button 
                                 className="remove-tech-btn"
@@ -6184,7 +6258,7 @@ function App() {
                                   <div className="area-technicians-list">
                                     {getTecnicosByArea(area.id).map(tecnico => (
                                       <span key={tecnico.id} className="tech-tag">
-                                        {tecnico.nome}
+                                        <TechnicianName name={tecnico.nome} maxLength={20} />
                                       </span>
                                     ))}
                                   </div>
