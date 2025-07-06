@@ -221,10 +221,16 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  min-width: 220px;
+  min-width: 280px;
   max-height: 320px;
   display: flex;
   flex-direction: column;
+}
+
+/* Modal especial para técnicos com mais altura */
+.filter-modal-content.technician-filter {
+  max-height: 380px;
+  min-height: 280px;
 }
 
 .filter-search {
@@ -239,7 +245,7 @@ body {
   padding: 8px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -250,14 +256,19 @@ body {
 .filter-options {
   max-height: 180px;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 4px 0;
   flex: 1;
+}
+
+/* Filtros de técnicos com mais altura */
+.filter-options.technician-filter {
+  max-height: 240px;
 }
 
 .filter-option {
   display: flex;
   align-items: center;
-  padding: 8px 16px;
+  padding: 6px 16px;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
@@ -271,7 +282,7 @@ body {
 }
 
 .filter-option label {
-  font-size: 14px;
+  font-size: 10px;
   cursor: pointer;
   flex: 1;
 }
@@ -281,14 +292,14 @@ body {
   text-align: center;
   color: #a0aec0;
   font-style: italic;
-  font-size: 14px;
+  font-size: 10px;
 }
 
 .filter-actions {
-  padding: 12px;
+  padding: 10px;
   border-top: 1px solid #e2e8f0;
   display: flex;
-  gap: 8px;
+  gap: 4px;
   flex-shrink: 0;
   background: white;
 }
@@ -297,24 +308,64 @@ body {
   background: #3182ce;
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   flex: 1;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.apply-btn:hover {
+  background: #2c5aa0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.select-all-btn {
+  background: #7c4dff;
+  color: white;
+  border: none;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  flex: 1;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.select-all-btn:hover {
+  background: #6b46c1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .cancel-btn {
   background: #f7fafc;
   color: #4a5568;
   border: 1px solid #e2e8f0;
-  padding: 6px 12px;
-  border-radius: 4px;
-  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   flex: 1;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.cancel-btn:hover {
+  background: #edf2f7;
+  border-color: #cbd5e0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Search Container */
@@ -492,12 +543,14 @@ body {
 
 .technician-filter-modal .filter-options-dropdown {
   min-width: 180px;
+  max-height: 320px;
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   padding: 4px 0;
   backdrop-filter: blur(10px);
+  overflow-y: auto;
 }
 
 .technician-filter-modal .filter-option-item {
@@ -540,11 +593,11 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 12px;
+  padding: 3px 10px;
   cursor: pointer;
   transition: all 0.15s ease;
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -561,7 +614,7 @@ body {
 
 .technician-filter-modal .filter-option-text {
   flex: 1;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: #374151;
   white-space: nowrap;
@@ -570,11 +623,11 @@ body {
 .technician-filter-modal .filter-option-badge {
   background: #f1f5f9;
   color: #64748b;
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 8px;
-  min-width: 16px;
+  padding: 1px 4px;
+  border-radius: 6px;
+  min-width: 14px;
   text-align: center;
 }
 
@@ -1675,7 +1728,7 @@ body {
   width: 100%;
   background: none;
   border: none;
-  padding: 12px 16px;
+  padding: 8px 16px;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -1695,7 +1748,7 @@ body {
 }
 
 .filter-option-label {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 500;
   color: #2d3748;
   display: flex;
@@ -1704,11 +1757,11 @@ body {
 }
 
 .filter-option-label i {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .filter-option-desc {
-  font-size: 11px;
+  font-size: 9px;
   color: #718096;
 }
 
@@ -1729,7 +1782,7 @@ body {
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   width: 280px;
-  max-height: 320px; /* Aumentar altura para acomodar 7 itens */
+  max-height: 420px; /* Aumentar altura para acomodar 7 itens */
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1847,7 +1900,7 @@ body {
 }
 
 .column-filter-content {
-  max-height: 180px; /* Aumentar para mostrar aproximadamente 7 itens */
+  max-height: 280px; /* Aumentar para mostrar aproximadamente 7 itens */
   overflow-y: auto;
   padding: 4px 16px 8px 16px; /* Reduzir padding superior */
   flex: 1;
@@ -1889,7 +1942,7 @@ body {
 }
 
 .column-filter-option-text {
-  font-size: 12px; /* Reduzir fonte para ser mais compacto */
+  font-size: 10px; /* Reduzir fonte para ser mais compacto */
   color: #4a5568;
   line-height: 1.3; /* Ajustar altura da linha */
 }
@@ -1910,14 +1963,14 @@ body {
   padding: 16px;
   text-align: center;
   color: #718096;
-  font-size: 13px;
+  font-size: 10px;
   font-style: italic;
 }
 
 .column-filter-actions {
   display: flex;
-  gap: 6px;
-  padding: 8px 16px; /* Reduzir padding */
+  gap: 4px;
+  padding: 8px 12px; /* Reduzir padding */
   border-top: 1px solid #e2e8f0;
   background: #f8f9fa;
   flex-shrink: 0; /* Garantir que não seja cortado */
@@ -1926,15 +1979,17 @@ body {
 .column-filter-clear,
 .column-filter-select-all,
 .column-filter-apply {
-  padding: 4px 8px; /* Diminuir altura em 20% */
+  padding: 5px 6px; /* Diminuir altura em 20% */
   border: 1px solid #e2e8f0;
-  border-radius: 4px;
-  font-size: 11px; /* Reduzir fonte */
+  border-radius: 6px;
+  font-size: 10px; /* Reduzir fonte */
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   flex: 1;
+  white-space: nowrap;
   min-height: 28px; /* Altura mínima para manter usabilidade */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .column-filter-clear {
@@ -1945,6 +2000,8 @@ body {
 .column-filter-clear:hover {
   background: #f7fafc;
   border-color: #cbd5e0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .column-filter-select-all {
@@ -1955,6 +2012,8 @@ body {
 
 .column-filter-select-all:hover {
   background: #f7fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .column-filter-apply {
@@ -1965,6 +2024,8 @@ body {
 
 .column-filter-apply:hover {
   background: #6b46c1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Tooltip para textos longos */

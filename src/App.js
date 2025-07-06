@@ -403,7 +403,6 @@ const TechnicianName = ({ name, maxLength = 25 }) => {
     </span>
   );
 };
-
 // Componente de gerenciamento de usuários
 const UserManagement = ({
   users,
@@ -1311,9 +1310,9 @@ function App() {
     }
   }, [connectionStatus, loadOrdersFromAPI]);
 
-  // Carregar técnicos, áreas e coordenadores quando navegar para a seção Equipe
+  // Carregar técnicos, áreas e coordenadores quando navegar para a seção Equipe ou Board
   useEffect(() => {
-    if (activeSection === 'Equipe') {
+    if (activeSection === 'Equipe' || activeSection === 'Board') {
       const loadTeamData = async () => {
         // Carregar técnicos, áreas e coordenadores em paralelo
         await Promise.all([
@@ -1414,7 +1413,21 @@ function App() {
   };
 
   // Abordagem simples sem estados complexos
+  // Função para aplicar filtros automáticos quando um filtro é selecionado
+  const applyAutomaticFilters = (type, newSelection) => {
+    console.log('🔍 applyAutomaticFilters called with type:', type, 'newSelection:', newSelection);
+    console.log('🔍 current selectedFilterItems:', selectedFilterItems);
+    
+    // Por ora, retornar filtros vazios para não interferir com a seleção
+    // A lógica de filtros automáticos será aplicada apenas na renderização das opções
+    const emptyFilters = {};
+    
+    console.log('🔍 applyAutomaticFilters returning (simplified):', emptyFilters);
+    return emptyFilters;
+  };
+
   const SimpleFilterModal = ({ type, options, onClose }) => {
+    console.log('🔍 SimpleFilterModal rendered for type:', type, 'with options:', options);
     const [searchTerm, setSearchTerm] = useState('');
     const currentSelected = selectedFilterItems[type] || [];
     
@@ -1425,26 +1438,66 @@ function App() {
     const isSelected = (item) => currentSelected.includes(item);
 
     const toggleItem = (item) => {
+      console.log('🔍 toggleItem called for:', item, 'type:', type);
+      console.log('🔍 currentSelected before:', currentSelected);
+      console.log('🔍 isSelected(item):', isSelected(item));
+      
       const newSelection = isSelected(item)
         ? currentSelected.filter(i => i !== item)
         : [...currentSelected, item];
       
-      setSelectedFilterItems(prev => ({
-        ...prev,
-        [type]: newSelection
-      }));
+      console.log('🔍 newSelection after toggle:', newSelection);
+      
+      // Aplicar filtros automáticos baseados na seleção
+      const updatedFilters = applyAutomaticFilters(type, newSelection);
+      console.log('🔍 updatedFilters:', updatedFilters);
+      
+      const finalUpdate = {
+        ...selectedFilterItems,
+        [type]: newSelection,
+        ...updatedFilters
+      };
+      console.log('🔍 finalUpdate to be applied:', finalUpdate);
+      
+      setSelectedFilterItems(finalUpdate);
     };
 
     const clearAll = () => {
-      setSelectedFilterItems(prev => ({
-        ...prev,
-        [type]: []
-      }));
+      console.log('🔍 clearAll called for type:', type);
+      
+      // Aplicar filtros automáticos quando limpar tudo
+      const updatedFilters = applyAutomaticFilters(type, []);
+      
+      const finalUpdate = {
+        ...selectedFilterItems,
+        [type]: [],
+        ...updatedFilters
+      };
+      console.log('🔍 clearAll finalUpdate:', finalUpdate);
+      
+      setSelectedFilterItems(finalUpdate);
+    };
+
+    const selectAll = () => {
+      console.log('🔍 selectAll called for type:', type);
+      console.log('🔍 selectAll filteredOptions:', filteredOptions);
+      
+      // Aplicar filtros automáticos quando selecionar tudo
+      const updatedFilters = applyAutomaticFilters(type, filteredOptions);
+      
+      const finalUpdate = {
+        ...selectedFilterItems,
+        [type]: filteredOptions,
+        ...updatedFilters
+      };
+      console.log('🔍 selectAll finalUpdate:', finalUpdate);
+      
+      setSelectedFilterItems(finalUpdate);
     };
 
     return (
       <div className="filter-modal">
-        <div className="filter-modal-content">
+        <div className={`filter-modal-content ${type === 'tecnico' ? 'technician-filter' : ''}`}>
           <div className="filter-search">
             <input 
               type="text" 
@@ -1455,7 +1508,7 @@ function App() {
               autoFocus
             />
           </div>
-          <div className="filter-options">
+          <div className={`filter-options ${type === 'tecnico' ? 'technician-filter' : ''}`}>
             {filteredOptions.length > 0 ? (
               filteredOptions.map(option => (
                 <div key={option} className="filter-option">
@@ -1470,13 +1523,19 @@ function App() {
               ))
             ) : (
               <div className="no-results">
-                Nenhum resultado encontrado
+                {options.length === 0 ? 
+                  `Nenhum ${type} disponível` : 
+                  'Nenhum resultado encontrado'
+                }
               </div>
             )}
           </div>
           <div className="filter-actions">
             <button className="apply-btn" onClick={onClose}>
               Aplicar ({currentSelected.length})
+            </button>
+            <button className="select-all-btn" onClick={selectAll}>
+              Marcar Todos
             </button>
             <button className="cancel-btn" onClick={clearAll}>
               Limpar Tudo
@@ -1489,19 +1548,98 @@ function App() {
 
 
 
+  // Função para obter opções de filtros interligados
   const getFilterOptions = (type) => {
+    console.log('🔍 getFilterOptions called for type:', type);
+    console.log('🔍 teamData state:', teamData);
+    
     switch(type) {
       case 'coordenador':
-        return mockData.coordenadores;
+        // Sempre mostrar todos os coordenadores disponíveis
+        const coordOptions = teamData.coordenadores.map(coord => coord.nome);
+        console.log('🔍 coordenador options:', coordOptions);
+        return coordOptions;
+      
       case 'area':
-        return activeFilters.coordenador 
-          ? mockData.areas[activeFilters.coordenador] || []
-          : Object.values(mockData.areas).flat();
+        // Se há coordenador selecionado, mostrar apenas suas áreas
+        if (selectedFilterItems.coordenador.length > 0) {
+          const coordenadorNomes = selectedFilterItems.coordenador;
+          const coordenadorIds = teamData.coordenadores
+            .filter(coord => coordenadorNomes.includes(coord.nome))
+            .map(coord => coord.id);
+          
+          const areaOptions = teamData.areas
+            .filter(area => coordenadorIds.includes(area.coordenadorId))
+            .map(area => area.nome);
+          console.log('🔍 area options (coordenador filtrado):', areaOptions);
+          return areaOptions;
+        }
+        
+        // Se há técnico selecionado, mostrar apenas a área do técnico
+        if (selectedFilterItems.tecnico.length > 0) {
+          const tecnicoNomes = selectedFilterItems.tecnico;
+          const tecnicoIds = teamData.tecnicos
+            .filter(tec => tecnicoNomes.includes(tec.nome))
+            .map(tec => tec.id);
+          
+          const areaIds = teamData.tecnicos
+            .filter(tec => tecnicoIds.includes(tec.id) && tec.areaId)
+            .map(tec => tec.areaId);
+          
+          const areaOptions = teamData.areas
+            .filter(area => areaIds.includes(area.id))
+            .map(area => area.nome);
+          console.log('🔍 area options (técnico filtrado):', areaOptions);
+          return areaOptions;
+        }
+        
+        // Caso contrário, mostrar apenas áreas que têm coordenador
+        const allAreaOptions = teamData.areas
+          .filter(area => area.coordenadorId)
+          .map(area => area.nome);
+        console.log('🔍 area options (todas com coordenador):', allAreaOptions);
+        return allAreaOptions;
+      
       case 'tecnico':
-        return activeFilters.coordenador 
-          ? mockData.tecnicos[activeFilters.coordenador] || []
-          : Object.values(mockData.tecnicos).flat();
+        // Se há coordenador selecionado, mostrar técnicos das áreas do coordenador
+        if (selectedFilterItems.coordenador.length > 0) {
+          const coordenadorNomes = selectedFilterItems.coordenador;
+          const coordenadorIds = teamData.coordenadores
+            .filter(coord => coordenadorNomes.includes(coord.nome))
+            .map(coord => coord.id);
+          
+          const areaIds = teamData.areas
+            .filter(area => coordenadorIds.includes(area.coordenadorId))
+            .map(area => area.id);
+          
+          const tecnicoOptions = teamData.tecnicos
+            .filter(tec => areaIds.includes(tec.areaId))
+            .map(tec => tec.nome);
+          console.log('🔍 tecnico options (coordenador filtrado):', tecnicoOptions);
+          return tecnicoOptions;
+        }
+        
+        // Se há área selecionada, mostrar técnicos da área
+        if (selectedFilterItems.area.length > 0) {
+          const areaNomes = selectedFilterItems.area;
+          const areaIds = teamData.areas
+            .filter(area => areaNomes.includes(area.nome))
+            .map(area => area.id);
+          
+          const tecnicoOptions = teamData.tecnicos
+            .filter(tec => areaIds.includes(tec.areaId))
+            .map(tec => tec.nome);
+          console.log('🔍 tecnico options (área filtrada):', tecnicoOptions);
+          return tecnicoOptions;
+        }
+        
+        // Caso contrário, mostrar todos os técnicos
+        const allTecnicoOptions = teamData.tecnicos.map(tec => tec.nome);
+        console.log('🔍 tecnico options (todos):', allTecnicoOptions);
+        return allTecnicoOptions;
+      
       default:
+        console.log('🔍 default case, returning empty array');
         return [];
     }
   };
@@ -6112,7 +6250,12 @@ function App() {
               <div className="filter-group">
                 <button 
                   className="filter-btn"
-                  onClick={() => setOpenModal(openModal === 'coordenador' ? null : 'coordenador')}
+                  onClick={() => {
+                    console.log('🔍 Coordenador button clicked! Current openModal:', openModal);
+                    console.log('🔍 isLoadingCoordinators:', isLoadingCoordinators);
+                    setOpenModal(openModal === 'coordenador' ? null : 'coordenador');
+                  }}
+                  disabled={isLoadingCoordinators}
                 >
                   Coordenador
                   {selectedFilterItems.coordenador.length > 0 && (
@@ -6124,7 +6267,10 @@ function App() {
                   <SimpleFilterModal 
                     type="coordenador"
                     options={getFilterOptions('coordenador')}
-                    onClose={() => setOpenModal(null)}
+                    onClose={() => {
+                      console.log('🔍 Closing coordenador modal');
+                      setOpenModal(null);
+                    }}
                   />
                 )}
               </div>
@@ -6132,7 +6278,12 @@ function App() {
               <div className="filter-group">
                 <button 
                   className="filter-btn"
-                  onClick={() => setOpenModal(openModal === 'area' ? null : 'area')}
+                  onClick={() => {
+                    console.log('🔍 Área button clicked! Current openModal:', openModal);
+                    console.log('🔍 isLoadingCoordinators:', isLoadingCoordinators, 'isLoadingAreas:', isLoadingAreas);
+                    setOpenModal(openModal === 'area' ? null : 'area');
+                  }}
+                  disabled={isLoadingCoordinators || isLoadingAreas}
                 >
                   Área
                   {selectedFilterItems.area.length > 0 && (
@@ -6152,7 +6303,12 @@ function App() {
               <div className="filter-group">
                 <button 
                   className="filter-btn"
-                  onClick={() => setOpenModal(openModal === 'tecnico' ? null : 'tecnico')}
+                  onClick={() => {
+                    console.log('🔍 Técnicos button clicked! Current openModal:', openModal);
+                    console.log('🔍 isLoadingTechnicians:', isLoadingTechnicians, 'isLoadingAreas:', isLoadingAreas);
+                    setOpenModal(openModal === 'tecnico' ? null : 'tecnico');
+                  }}
+                  disabled={isLoadingTechnicians || isLoadingAreas}
                 >
                   Técnicos
                   {selectedFilterItems.tecnico.length > 0 && (
@@ -6836,3 +6992,4 @@ function App() {
 }
 
 export default App;
+
