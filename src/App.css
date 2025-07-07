@@ -5309,3 +5309,72 @@ body {
   }
 }
 
+/* Placeholder para colunas de técnicos */
+.technician-columns-placeholder {
+  min-width: 320px;
+  max-width: 400px;
+  background: #f8f9fa;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  margin: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.placeholder-content i {
+  font-size: 48px;
+  color: #9ca3af;
+}
+
+.placeholder-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0;
+}
+
+.placeholder-description {
+  font-size: 14px;
+  color: #6b7280;
+  line-height: 1.4;
+  margin: 0;
+  max-width: 280px;
+}
+
+.placeholder-description strong {
+  color: #374151;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .technician-columns-placeholder {
+    min-width: 260px;
+    max-width: 300px;
+    padding: 30px 16px;
+  }
+  
+  .placeholder-content i {
+    font-size: 40px;
+  }
+  
+  .placeholder-title {
+    font-size: 14px;
+  }
+  
+  .placeholder-description {
+    font-size: 12px;
+    max-width: 220px;
+  }
+}
+

@@ -1927,12 +1927,86 @@ function App() {
     return Object.values(mockData.tecnicos).flat();
   };
 
-  const getVisibleTechniques = React.useMemo(() => {
-    if (selectedFilterItems.tecnico.length > 0) {
-      return selectedFilterItems.tecnico;
+  // Função para verificar se há filtros ativos (coordenador, área ou técnico)
+  const hasActiveTeamFilters = () => {
+    return selectedFilterItems.coordenador.length > 0 || 
+           selectedFilterItems.area.length > 0 || 
+           selectedFilterItems.tecnico.length > 0;
+  };
+
+  // Função para obter técnicos baseado nos filtros aplicados usando relacionamentos da equipe
+  const getFilteredTechnicians = React.useMemo(() => {
+    // Se não há filtros de equipe ativos, não mostrar técnicos
+    if (!hasActiveTeamFilters()) {
+      return [];
     }
-    return getAllTechniques();
-  }, [selectedFilterItems.tecnico]);
+
+    let filteredTechnicians = [];
+
+    // Se filtrou técnicos diretamente
+    if (selectedFilterItems.tecnico.length > 0) {
+      filteredTechnicians = [...selectedFilterItems.tecnico];
+    }
+
+    // Se filtrou áreas, incluir técnicos dessas áreas
+    if (selectedFilterItems.area.length > 0) {
+      const techsFromAreas = [];
+      selectedFilterItems.area.forEach(areaName => {
+        // Encontrar a área no teamData
+        const area = teamData.areas.find(a => a.nome === areaName);
+        if (area) {
+          // Encontrar técnicos vinculados a esta área
+          const areaId = area.id;
+          teamData.tecnicos.forEach(tecnico => {
+            if (tecnico.areaId === areaId && !techsFromAreas.includes(tecnico.nome)) {
+              techsFromAreas.push(tecnico.nome);
+            }
+          });
+        }
+      });
+      
+      // Combinar com técnicos já selecionados
+      filteredTechnicians = [...new Set([...filteredTechnicians, ...techsFromAreas])];
+    }
+
+    // Se filtrou coordenadores, incluir técnicos das áreas desses coordenadores
+    if (selectedFilterItems.coordenador.length > 0) {
+      const techsFromCoords = [];
+      selectedFilterItems.coordenador.forEach(coordName => {
+        // Encontrar o coordenador no teamData
+        const coord = teamData.coordenadores.find(c => c.nome === coordName);
+        if (coord) {
+          const coordId = coord.id;
+          // Encontrar áreas deste coordenador
+          const coordAreas = teamData.areas.filter(area => area.coordenadorId === coordId);
+          
+          // Para cada área do coordenador, encontrar técnicos
+          coordAreas.forEach(area => {
+            const areaId = area.id;
+            teamData.tecnicos.forEach(tecnico => {
+              if (tecnico.areaId === areaId && !techsFromCoords.includes(tecnico.nome)) {
+                techsFromCoords.push(tecnico.nome);
+              }
+            });
+          });
+        }
+      });
+      
+      // Combinar com técnicos já selecionados
+      filteredTechnicians = [...new Set([...filteredTechnicians, ...techsFromCoords])];
+    }
+
+    console.log('🔍 Filtros ativos - Coordenador:', selectedFilterItems.coordenador);
+    console.log('🔍 Filtros ativos - Área:', selectedFilterItems.area);
+    console.log('🔍 Filtros ativos - Técnico:', selectedFilterItems.tecnico);
+    console.log('🔍 Técnicos filtrados resultantes:', filteredTechnicians);
+
+    return filteredTechnicians;
+  }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData]);
+
+  const getVisibleTechniques = React.useMemo(() => {
+    return getFilteredTechnicians;
+  }, [getFilteredTechnicians]);
 
   // Inicializar colunas de técnicos quando os filtros mudarem
   React.useEffect(() => {
@@ -6571,7 +6645,8 @@ function App() {
                 </div>
               </div>
 
-              {columnOrder.map((technician, index) => (
+              {/* Mostrar colunas de técnicos apenas quando há filtros de equipe ativos */}
+              {hasActiveTeamFilters() && columnOrder.map((technician, index) => (
                 <TechnicianColumn
                   key={technician}
                   technician={technician}
@@ -6579,6 +6654,20 @@ function App() {
                   index={index}
                 />
               ))}
+
+              {/* Indicador quando não há filtros de equipe ativos */}
+              {!hasActiveTeamFilters() && (
+                <div className="technician-columns-placeholder">
+                  <div className="placeholder-content">
+                    <i className="bi bi-people"></i>
+                    <p className="placeholder-title">Colunas de Técnicos</p>
+                    <p className="placeholder-description">
+                      Aplique filtros de <strong>Coordenador</strong>, <strong>Área</strong> ou <strong>Técnicos</strong> 
+                      para visualizar as colunas dos técnicos relacionados
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </>
