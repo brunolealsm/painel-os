@@ -403,6 +403,82 @@ const TechnicianName = ({ name, maxLength = 25 }) => {
     </span>
   );
 };
+
+// Modal de carregamento inicial
+const InitialLoadingModal = ({ isOpen, steps }) => {
+  if (!isOpen) return null;
+
+  const getStepIcon = (status) => {
+    switch (status) {
+      case 'completed':
+        return <i className="bi bi-check-circle-fill step-icon completed"></i>;
+      case 'loading':
+        return <i className="bi bi-arrow-repeat step-icon loading spin"></i>;
+      default:
+        return <i className="bi bi-circle step-icon pending"></i>;
+    }
+  };
+
+  const getStepClass = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'step-completed';
+      case 'loading':
+        return 'step-loading';
+      default:
+        return 'step-pending';
+    }
+  };
+
+  return (
+    <div className="initial-loading-overlay">
+      <div className="initial-loading-modal">
+        <div className="loading-header">
+          <div className="loading-logo">
+            <i className="bi bi-gear-fill"></i>
+          </div>
+          <h2>Inicializando Sistema</h2>
+          <p>Carregando dados e configurações...</p>
+        </div>
+        
+        <div className="loading-steps">
+          {steps.map((step, index) => (
+            <div key={step.id} className={`loading-step ${getStepClass(step.status)}`}>
+              <div className="step-number">{index + 1}</div>
+              <div className="step-content">
+                <div className="step-title">{step.name}</div>
+                <div className="step-status">
+                  {step.status === 'completed' && 'Concluído'}
+                  {step.status === 'loading' && 'Carregando...'}
+                  {step.status === 'pending' && 'Aguardando'}
+                </div>
+              </div>
+              <div className="step-icon-container">
+                {getStepIcon(step.status)}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="loading-footer">
+          <div className="loading-progress">
+            <div className="progress-bar">
+              <div 
+                className="progress-fill" 
+                style={{
+                  width: `${(steps.filter(s => s.status === 'completed').length / steps.length) * 100}%`
+                }}
+              ></div>
+            </div>
+            <div className="progress-text">
+              {steps.filter(s => s.status === 'completed').length} de {steps.length} etapas concluídas
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 // Componente de gerenciamento de usuários
 const UserManagement = ({
   users,
@@ -1071,6 +1147,23 @@ function App() {
   });
   const [userFormErrors, setUserFormErrors] = useState({});
 
+  // Estados para o modal de carregamento inicial
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadingSteps, setLoadingSteps] = useState([
+    { id: 'config', name: 'Carregando configuração', status: 'pending' },
+    { id: 'orders', name: 'Conectando ao banco de dados', status: 'pending' },
+    { id: 'team', name: 'Carregando dados da equipe', status: 'pending' },
+    { id: 'filters', name: 'Aplicando filtros iniciais', status: 'pending' },
+    { id: 'complete', name: 'Finalizando carregamento', status: 'pending' }
+  ]);
+
+  // Função para atualizar status de uma etapa
+  const updateLoadingStep = useCallback((stepId, status) => {
+    setLoadingSteps(prev => prev.map(step => 
+      step.id === stepId ? { ...step, status } : step
+    ));
+  }, []);
+
   // Função para carregar dados da API
   const loadOrdersFromAPI = useCallback(async () => {
     const startTime = performance.now();
@@ -1401,23 +1494,70 @@ function App() {
     }
   }, []);
 
-  // Carregar dados iniciais e configuração salva
+  // Carregar dados iniciais com modal de progresso
   useEffect(() => {
-    // Carregar configuração salva do localStorage
-    const savedConfig = localStorage.getItem('dbConfig');
-    if (savedConfig) {
+    const initializeApp = async () => {
       try {
-        const config = JSON.parse(savedConfig);
-        setDbConfig(config);
-        console.log('📋 Configuração carregada do localStorage');
+        // Etapa 1: Carregar configuração
+        updateLoadingStep('config', 'loading');
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simular carregamento
+        
+        const savedConfig = localStorage.getItem('dbConfig');
+        if (savedConfig) {
+          try {
+            const config = JSON.parse(savedConfig);
+            setDbConfig(config);
+            console.log('📋 Configuração carregada do localStorage');
+          } catch (error) {
+            console.error('❌ Erro ao carregar configuração do localStorage:', error);
+          }
+        }
+        updateLoadingStep('config', 'completed');
+        
+        // Etapa 2: Carregar ordens do banco
+        updateLoadingStep('orders', 'loading');
+        await loadOrdersFromAPI();
+        updateLoadingStep('orders', 'completed');
+        
+        // Etapa 3: Carregar dados da equipe
+        updateLoadingStep('team', 'loading');
+        await Promise.all([
+          loadTechniciansFromAPI(),
+          loadAreasFromAPI(),
+          loadCoordinatorsFromAPI()
+        ]);
+        await Promise.all([
+          loadAreaTeamFromAPI(),
+          loadAreaCoordFromAPI()
+        ]);
+        updateLoadingStep('team', 'completed');
+        
+        // Etapa 4: Aplicar filtros iniciais
+        updateLoadingStep('filters', 'loading');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        updateLoadingStep('filters', 'completed');
+        
+        // Etapa 5: Finalizar
+        updateLoadingStep('complete', 'loading');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        updateLoadingStep('complete', 'completed');
+        
+        // Aguardar um pouco para mostrar que completou
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, 800);
+        
       } catch (error) {
-        console.error('❌ Erro ao carregar configuração do localStorage:', error);
+        console.error('❌ Erro durante inicialização:', error);
+        // Em caso de erro, ainda assim fechar o modal após um tempo
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, 2000);
       }
-    }
+    };
 
-    // Carregar dados da API
-    loadOrdersFromAPI();
-  }, [loadOrdersFromAPI]);
+    initializeApp();
+  }, [loadOrdersFromAPI, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI, updateLoadingStep]);
 
   // Recarregar dados quando a configuração for salva
   useEffect(() => {
@@ -1430,6 +1570,8 @@ function App() {
   }, [connectionStatus, loadOrdersFromAPI]);
 
   // Carregar técnicos, áreas e coordenadores quando navegar para a seção Equipe ou Board
+  // (Comentado pois agora os dados são carregados no useEffect inicial)
+  /*
   useEffect(() => {
     if (activeSection === 'Equipe' || activeSection === 'Board') {
       const loadTeamData = async () => {
@@ -1471,6 +1613,7 @@ function App() {
       loadTeamData();
     }
   }, [activeSection, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI]);
+  */
 
   // Função para mapear tipo de serviço baseado em TB02115_PREVENTIVA
   const getServiceTypeFromPreventiva = (preventiva) => {
@@ -1941,11 +2084,11 @@ function App() {
       return [];
     }
 
-    let filteredTechnicians = [];
+    let allFilteredTechnicians = [];
 
     // Se filtrou técnicos diretamente
     if (selectedFilterItems.tecnico.length > 0) {
-      filteredTechnicians = [...selectedFilterItems.tecnico];
+      allFilteredTechnicians = [...allFilteredTechnicians, ...selectedFilterItems.tecnico];
     }
 
     // Se filtrou áreas, incluir técnicos dessas áreas
@@ -1964,9 +2107,7 @@ function App() {
           });
         }
       });
-      
-      // Combinar com técnicos já selecionados
-      filteredTechnicians = [...new Set([...filteredTechnicians, ...techsFromAreas])];
+      allFilteredTechnicians = [...allFilteredTechnicians, ...techsFromAreas];
     }
 
     // Se filtrou coordenadores, incluir técnicos das áreas desses coordenadores
@@ -1991,17 +2132,19 @@ function App() {
           });
         }
       });
-      
-      // Combinar com técnicos já selecionados
-      filteredTechnicians = [...new Set([...filteredTechnicians, ...techsFromCoords])];
+      allFilteredTechnicians = [...allFilteredTechnicians, ...techsFromCoords];
     }
+
+    // Remover duplicatas e retornar a lista final
+    const uniqueFilteredTechnicians = [...new Set(allFilteredTechnicians)];
 
     console.log('🔍 Filtros ativos - Coordenador:', selectedFilterItems.coordenador);
     console.log('🔍 Filtros ativos - Área:', selectedFilterItems.area);
     console.log('🔍 Filtros ativos - Técnico:', selectedFilterItems.tecnico);
-    console.log('🔍 Técnicos filtrados resultantes:', filteredTechnicians);
+    console.log('🔍 Técnicos das áreas dos coordenadores encontrados:', selectedFilterItems.coordenador.length > 0 ? 'Verificando...' : 'N/A');
+    console.log('🔍 Técnicos filtrados resultantes:', uniqueFilteredTechnicians);
 
-    return filteredTechnicians;
+    return uniqueFilteredTechnicians;
   }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData]);
 
   const getVisibleTechniques = React.useMemo(() => {
@@ -2011,100 +2154,110 @@ function App() {
   // Inicializar colunas de técnicos quando os filtros mudarem
   React.useEffect(() => {
     const visibleTechs = getVisibleTechniques;
-    let hasChanges = false;
-    const newTechniqueColumns = {};
-    const newTechnicianGroups = {};
+    console.log('🔄 Atualizando colunas de técnicos para:', visibleTechs);
     
-    visibleTechs.forEach((tech, index) => {
-      if (!techniqueColumns[tech]) {
-        newTechniqueColumns[tech] = [];
-        hasChanges = true;
-      } else {
-        newTechniqueColumns[tech] = techniqueColumns[tech];
-      }
+    // Verificar se a lista de técnicos realmente mudou
+    const currentTechsString = JSON.stringify(columnOrder.sort());
+    const newTechsString = JSON.stringify(visibleTechs.sort());
+    
+    if (currentTechsString !== newTechsString) {
+      console.log('🔄 Lista de técnicos mudou, atualizando colunas');
       
-      // Inicializar grupos para cada técnico
-      if (!technicianGroups[tech]) {
-        hasChanges = true;
-        // Adicionar ordens de exemplo apenas para o primeiro técnico
-        const isFirstTech = index === 0;
-        newTechnicianGroups[tech] = {
-          'Em serviço': isFirstTech ? [
-            { 
-              id: 'OS-EM001', 
-              tipo: 'N', 
-              cliente: 'Empresa Tech Solutions',
-              equipamento: 'Impressora HP LaserJet Pro',
-              cidade: 'São Paulo',
-              sla: 'ok',
-              emAndamento: true 
-            }
-          ] : [],
-          'Previsto para hoje': isFirstTech ? [
-            { 
-              id: 'OS-HJ001', 
-              tipo: 'I', 
-              cliente: 'Banco Central SP',
-              equipamento: 'ATM Diebold Nixdorf',
-              cidade: 'São Paulo',
-              sla: 'vencendo' 
-            },
-            { 
-              id: 'OS-HJ002', 
-              tipo: 'S', 
-              cliente: 'Hospital Santa Casa',
-              equipamento: 'Monitor Philips IntelliVue',
-              cidade: 'São Paulo',
-              sla: 'ok' 
-            },
-            { 
-              id: 'OS-HJ003', 
-              tipo: 'N', 
-              cliente: 'Loja Magazine Luiza',
-              equipamento: 'POS Ingenico iWL250',
-              cidade: 'Rio de Janeiro',
-              sla: 'vencido' 
-            }
-          ] : [],
-          'Previstas para amanhã': isFirstTech ? [
-            { 
-              id: 'OS-AM001', 
-              tipo: 'D', 
-              cliente: 'Shopping Barra',
-              equipamento: 'Câmera Hikvision DS-2CD',
-              cidade: 'Rio de Janeiro',
-              sla: 'ok' 
-            },
-            { 
-              id: 'OS-AM002', 
-              tipo: 'I', 
-              cliente: 'Vale Mineração',
-              equipamento: 'Tablet Samsung Galaxy Tab',
-              cidade: 'Belo Horizonte',
-              sla: 'ok' 
-            }
-          ] : [],
-          'Futura': isFirstTech ? [
-            { 
-              id: 'OS-FUT001', 
-              tipo: 'S', 
-              cliente: 'Ministério da Fazenda',
-              equipamento: 'Servidor Dell PowerEdge',
-              cidade: 'Brasília',
-              sla: 'ok' 
-            }
-          ] : []
-        };
-      } else {
-        newTechnicianGroups[tech] = technicianGroups[tech];
-      }
-    });
+      const newTechniqueColumns = {};
+      const newTechnicianGroups = {};
+      
+      visibleTechs.forEach((tech, index) => {
+        // Preservar dados existentes se o técnico já tinha uma coluna
+        if (techniqueColumns[tech]) {
+          newTechniqueColumns[tech] = techniqueColumns[tech];
+        } else {
+          newTechniqueColumns[tech] = [];
+        }
+        
+        // Preservar grupos existentes se o técnico já tinha grupos
+        if (technicianGroups[tech]) {
+          newTechnicianGroups[tech] = technicianGroups[tech];
+        } else {
+          // Inicializar grupos para técnico novo
+          const isFirstTech = index === 0;
+          newTechnicianGroups[tech] = {
+            'Em serviço': isFirstTech ? [
+              { 
+                id: 'OS-EM001', 
+                tipo: 'N', 
+                cliente: 'Empresa Tech Solutions',
+                equipamento: 'Impressora HP LaserJet Pro',
+                cidade: 'São Paulo',
+                sla: 'ok',
+                emAndamento: true 
+              }
+            ] : [],
+            'Previsto para hoje': isFirstTech ? [
+              { 
+                id: 'OS-HJ001', 
+                tipo: 'I', 
+                cliente: 'Banco Central SP',
+                equipamento: 'ATM Diebold Nixdorf',
+                cidade: 'São Paulo',
+                sla: 'vencendo' 
+              },
+              { 
+                id: 'OS-HJ002', 
+                tipo: 'S', 
+                cliente: 'Hospital Santa Casa',
+                equipamento: 'Monitor Philips IntelliVue',
+                cidade: 'São Paulo',
+                sla: 'ok' 
+              },
+              { 
+                id: 'OS-HJ003', 
+                tipo: 'N', 
+                cliente: 'Loja Magazine Luiza',
+                equipamento: 'POS Ingenico iWL250',
+                cidade: 'Rio de Janeiro',
+                sla: 'vencido' 
+              }
+            ] : [],
+            'Previstas para amanhã': isFirstTech ? [
+              { 
+                id: 'OS-AM001', 
+                tipo: 'D', 
+                cliente: 'Shopping Barra',
+                equipamento: 'Câmera Hikvision DS-2CD',
+                cidade: 'Rio de Janeiro',
+                sla: 'ok' 
+              },
+              { 
+                id: 'OS-AM002', 
+                tipo: 'I', 
+                cliente: 'Vale Mineração',
+                equipamento: 'Tablet Samsung Galaxy Tab',
+                cidade: 'Belo Horizonte',
+                sla: 'ok' 
+              }
+            ] : [],
+            'Futura': isFirstTech ? [
+              { 
+                id: 'OS-FUT001', 
+                tipo: 'S', 
+                cliente: 'Ministério da Fazenda',
+                equipamento: 'Servidor Dell PowerEdge',
+                cidade: 'Brasília',
+                sla: 'ok' 
+              }
+            ] : []
+          };
+        }
+      });
 
-    // Só atualizar se houve mudanças
-    if (hasChanges) {
+      // Atualizar estados
       setTechniqueColumns(newTechniqueColumns);
       setTechnicianGroups(newTechnicianGroups);
       setColumnOrder(visibleTechs);
+      
+      console.log('✅ Colunas de técnicos atualizadas:', visibleTechs);
+    } else {
+      console.log('📋 Lista de técnicos não mudou, mantendo colunas atuais');
     }
   }, [getVisibleTechniques]);
 
@@ -6339,8 +6492,9 @@ function App() {
   };
 
   return (
-    <div className="app">
-      <header className="main-header">
+    <>
+      <div className={`app ${isInitialLoading ? 'loading' : ''}`}>
+        <header className="main-header">
         <div className="company-name">Empresa teste</div>
         <nav className="main-nav">
           <button 
@@ -7216,7 +7370,15 @@ function App() {
           setSelectedEquipmentData(null);
         }}
       />
-    </div>
+
+      </div>
+
+      {/* Modal de carregamento inicial */}
+      <InitialLoadingModal 
+        isOpen={isInitialLoading}
+        steps={loadingSteps}
+      />
+    </>
   );
 }
 

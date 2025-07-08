@@ -14,6 +14,14 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: filter 0.3s ease;
+}
+
+.app.loading {
+  filter: blur(3px) !important;
+  pointer-events: none !important;
+  position: relative !important;
+  z-index: 1 !important;
 }
 
 /* Header Styles */
@@ -5375,6 +5383,329 @@ body {
   .placeholder-description {
     font-size: 12px;
     max-width: 220px;
+  }
+}
+
+/* Modal de carregamento inicial */
+.initial-loading-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: rgba(15, 23, 42, 0.8) !important;
+  backdrop-filter: blur(8px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 999999 !important;
+  animation: fadeIn 0.3s ease-out;
+  isolation: isolate !important;
+  transform: translateZ(0) !important;
+}
+
+.initial-loading-modal {
+  background: white !important;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  width: 90%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow: hidden;
+  animation: slideUp 0.4s ease-out;
+  position: relative !important;
+  z-index: 1 !important;
+  transform: translateZ(0) !important;
+  filter: none !important;
+}
+
+.loading-header {
+  padding: 32px 32px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.loading-logo {
+  width: 64px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  animation: pulse 2s infinite;
+}
+
+.loading-logo i {
+  font-size: 28px;
+  animation: spin 3s linear infinite;
+}
+
+.loading-header h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.loading-header p {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.loading-steps {
+  padding: 16px 32px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.loading-step {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.3s ease;
+}
+
+.loading-step:last-child {
+  border-bottom: none;
+}
+
+.step-number {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 12px;
+  transition: all 0.3s ease;
+}
+
+.step-content {
+  flex: 1;
+  margin-right: 12px;
+}
+
+.step-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.step-status {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.step-icon-container {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-icon {
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.step-icon.pending {
+  color: #d1d5db;
+}
+
+.step-icon.loading {
+  color: #3b82f6;
+}
+
+.step-icon.completed {
+  color: #10b981;
+}
+
+/* Estados das etapas */
+.loading-step.step-loading {
+  background: rgba(59, 130, 246, 0.05);
+  border-radius: 8px;
+  padding: 10px 8px;
+  margin: 2px 0;
+}
+
+.loading-step.step-loading .step-number {
+  background: #3b82f6;
+  color: white;
+}
+
+.loading-step.step-loading .step-title {
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.loading-step.step-completed {
+  opacity: 0.8;
+}
+
+.loading-step.step-completed .step-number {
+  background: #10b981;
+  color: white;
+}
+
+.loading-step.step-completed .step-title {
+  color: #059669;
+}
+
+.loading-footer {
+  padding: 16px 32px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.loading-progress {
+  text-align: center;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Responsividade do modal */
+@media (max-width: 768px) {
+  .initial-loading-modal {
+    width: 95%;
+    max-width: 420px;
+  }
+  
+  .loading-header {
+    padding: 24px 24px 20px;
+  }
+  
+  .loading-logo {
+    width: 56px;
+    height: 56px;
+    margin-bottom: 12px;
+  }
+  
+  .loading-logo i {
+    font-size: 24px;
+  }
+  
+  .loading-header h2 {
+    font-size: 20px;
+  }
+  
+  .loading-steps {
+    padding: 12px 20px;
+  }
+  
+  .loading-step {
+    padding: 8px 0;
+  }
+  
+  .step-number {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+    margin-right: 10px;
+  }
+  
+  .step-title {
+    font-size: 13px;
+  }
+  
+  .step-status {
+    font-size: 10px;
+  }
+  
+  .loading-footer {
+    padding: 12px 20px 16px;
   }
 }
 
