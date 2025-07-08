@@ -381,6 +381,208 @@ const DatabaseConfig = ({
   );
 };
 
+// Componente de configuração dos processos
+const ProcessConfig = () => {
+  const [processConfig, setProcessConfig] = useState({
+    status_inservice: '',
+    status_forward: '',
+    status_tomorrow: '',
+    status_uptodate: ''
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState(null);
+
+  // Função para validar entrada
+  const validateInput = (value) => {
+    // Aceita apenas letras e números, máximo 2 caracteres
+    const regex = /^[A-Za-z0-9]{0,2}$/;
+    return regex.test(value);
+  };
+
+  // Função para lidar com mudanças nos inputs
+  const handleInputChange = (field, value) => {
+    if (validateInput(value)) {
+      setProcessConfig(prev => ({
+        ...prev,
+        [field]: value.toUpperCase() // Converter para maiúsculo
+      }));
+      setSaveStatus(null);
+    }
+  };
+
+  // Carregar configurações existentes
+  const loadProcessConfig = async () => {
+    try {
+      setIsLoading(true);
+      console.log('🔄 Carregando configurações de processo...');
+      
+      const response = await fetch(`${API_BASE_URL}/api/config/process`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        console.log('✅ Configurações de processo carregadas:', result.data);
+        setProcessConfig({
+          status_inservice: result.data.status_inservice || '',
+          status_forward: result.data.status_forward || '',
+          status_tomorrow: result.data.status_tomorrow || '',
+          status_uptodate: result.data.status_uptodate || ''
+        });
+      } else {
+        console.log('ℹ️ Nenhuma configuração encontrada, usando valores padrão');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar configurações de processo:', error);
+      setSaveStatus({
+        success: false,
+        message: `Erro ao carregar configurações: ${error.message}`
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Salvar configurações
+  const saveProcessConfig = async () => {
+    try {
+      setIsSaving(true);
+      setSaveStatus(null);
+      console.log('💾 Salvando configurações de processo...');
+
+      const response = await fetch(`${API_BASE_URL}/api/config/process`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(processConfig)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Configurações de processo salvas com sucesso!');
+        setSaveStatus({
+          success: true,
+          message: 'Configurações salvas com sucesso!'
+        });
+      } else {
+        console.log('❌ Erro ao salvar:', result.message);
+        setSaveStatus({
+          success: false,
+          message: result.message
+        });
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar configurações:', error);
+      setSaveStatus({
+        success: false,
+        message: `Erro ao salvar: ${error.message}`
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Carregar dados na inicialização
+  useEffect(() => {
+    loadProcessConfig();
+  }, []);
+
+  return (
+    <div className="database-config">
+      <h3 className="config-title">Configuração de processos</h3>
+      <p className="config-description">Configure o processo de ordens de serviço</p>
+      
+      {isLoading ? (
+        <div className="loading-message">Carregando configurações...</div>
+      ) : (
+        <div className="config-form">
+          <div className="form-group">
+            <label htmlFor="status_inservice">Em serviço</label>
+            <input
+              type="text"
+              id="status_inservice"
+              value={processConfig.status_inservice}
+              onChange={(e) => handleInputChange('status_inservice', e.target.value)}
+              placeholder="Ex: ES"
+              className="form-input process-input"
+              maxLength="2"
+            />
+            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status_forward">Encaminhado ao técnico</label>
+            <input
+              type="text"
+              id="status_forward"
+              value={processConfig.status_forward}
+              onChange={(e) => handleInputChange('status_forward', e.target.value)}
+              placeholder="Ex: ET"
+              className="form-input process-input"
+              maxLength="2"
+            />
+            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status_tomorrow">Para atender no próximo dia</label>
+            <input
+              type="text"
+              id="status_tomorrow"
+              value={processConfig.status_tomorrow}
+              onChange={(e) => handleInputChange('status_tomorrow', e.target.value)}
+              placeholder="Ex: PD"
+              className="form-input process-input"
+              maxLength="2"
+            />
+            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status_uptodate">Em dia ou futura</label>
+            <input
+              type="text"
+              id="status_uptodate"
+              value={processConfig.status_uptodate}
+              onChange={(e) => handleInputChange('status_uptodate', e.target.value)}
+              placeholder="Ex: ED"
+              className="form-input process-input"
+              maxLength="2"
+            />
+            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+          </div>
+
+          <div className="form-actions">
+            <button 
+              onClick={saveProcessConfig}
+              disabled={isSaving}
+              className="btn-save"
+            >
+              {isSaving ? 'Salvando...' : 'Salvar dados'}
+            </button>
+          </div>
+
+          {saveStatus && (
+            <div className={`connection-status ${saveStatus.success ? 'success' : 'error'}`}>
+              <span className="status-icon">
+                {saveStatus.success ? '✓' : '✗'}
+              </span>
+              <span className="status-message">{saveStatus.message}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Componente para mostrar nome de técnico com tooltip se necessário
 const TechnicianName = ({ name, maxLength = 25 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
@@ -405,7 +607,7 @@ const TechnicianName = ({ name, maxLength = 25 }) => {
 };
 
 // Modal de carregamento inicial
-const InitialLoadingModal = ({ isOpen, steps }) => {
+const InitialLoadingModal = ({ isOpen, steps, hasError, errorMessage, onContinue }) => {
   if (!isOpen) return null;
 
   const getStepIcon = (status) => {
@@ -414,6 +616,10 @@ const InitialLoadingModal = ({ isOpen, steps }) => {
         return <i className="bi bi-check-circle-fill step-icon completed"></i>;
       case 'loading':
         return <i className="bi bi-arrow-repeat step-icon loading spin"></i>;
+      case 'error':
+        return <i className="bi bi-x-circle-fill step-icon error"></i>;
+      case 'skipped':
+        return <i className="bi bi-dash-circle step-icon skipped"></i>;
       default:
         return <i className="bi bi-circle step-icon pending"></i>;
     }
@@ -425,21 +631,52 @@ const InitialLoadingModal = ({ isOpen, steps }) => {
         return 'step-completed';
       case 'loading':
         return 'step-loading';
+      case 'error':
+        return 'step-error';
+      case 'skipped':
+        return 'step-skipped';
       default:
         return 'step-pending';
     }
   };
 
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'completed':
+        return 'Concluído';
+      case 'loading':
+        return 'Carregando...';
+      case 'error':
+        return 'Erro';
+      case 'skipped':
+        return 'Ignorado';
+      default:
+        return 'Aguardando';
+    }
+  };
+
+  const completedSteps = steps.filter(s => s.status === 'completed').length;
+  const hasErrors = steps.some(s => s.status === 'error');
+
   return (
     <div className="initial-loading-overlay">
       <div className="initial-loading-modal">
-        <div className="loading-header">
+        <div className={`loading-header ${hasErrors ? 'error' : ''}`}>
           <div className="loading-logo">
-            <i className="bi bi-gear-fill"></i>
+            <i className={hasErrors ? "bi bi-exclamation-triangle-fill" : "bi bi-gear-fill"}></i>
           </div>
-          <h2>Inicializando Sistema</h2>
-          <p>Carregando dados e configurações...</p>
+          <h2>{hasErrors ? 'Problema na Inicialização' : 'Inicializando Sistema'}</h2>
+          <p>{hasErrors ? 'Alguns problemas foram encontrados durante o carregamento.' : 'Carregando dados e configurações...'}</p>
         </div>
+        
+        {hasError && errorMessage && (
+          <div className="loading-error-message">
+            <div className="error-icon">
+              <i className="bi bi-exclamation-circle"></i>
+            </div>
+            <div className="error-text">{errorMessage}</div>
+          </div>
+        )}
         
         <div className="loading-steps">
           {steps.map((step, index) => (
@@ -448,9 +685,7 @@ const InitialLoadingModal = ({ isOpen, steps }) => {
               <div className="step-content">
                 <div className="step-title">{step.name}</div>
                 <div className="step-status">
-                  {step.status === 'completed' && 'Concluído'}
-                  {step.status === 'loading' && 'Carregando...'}
-                  {step.status === 'pending' && 'Aguardando'}
+                  {getStatusText(step.status)}
                 </div>
               </div>
               <div className="step-icon-container">
@@ -464,16 +699,28 @@ const InitialLoadingModal = ({ isOpen, steps }) => {
           <div className="loading-progress">
             <div className="progress-bar">
               <div 
-                className="progress-fill" 
+                className={`progress-fill ${hasErrors ? 'error' : ''}`}
                 style={{
-                  width: `${(steps.filter(s => s.status === 'completed').length / steps.length) * 100}%`
+                  width: `${(completedSteps / steps.length) * 100}%`
                 }}
               ></div>
             </div>
             <div className="progress-text">
-              {steps.filter(s => s.status === 'completed').length} de {steps.length} etapas concluídas
+              {hasErrors ? 
+                `${completedSteps} de ${steps.length} etapas concluídas (com problemas)` :
+                `${completedSteps} de ${steps.length} etapas concluídas`
+              }
             </div>
           </div>
+          
+          {hasError && onContinue && (
+            <div className="loading-actions">
+              <button className="btn-continue" onClick={onContinue}>
+                <i className="bi bi-arrow-right"></i>
+                Continuar mesmo assim
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1156,6 +1403,8 @@ function App() {
     { id: 'filters', name: 'Aplicando filtros iniciais', status: 'pending' },
     { id: 'complete', name: 'Finalizando carregamento', status: 'pending' }
   ]);
+  const [loadingHasError, setLoadingHasError] = useState(false);
+  const [loadingErrorMessage, setLoadingErrorMessage] = useState('');
 
   // Função para atualizar status de uma etapa
   const updateLoadingStep = useCallback((stepId, status) => {
@@ -1514,10 +1763,54 @@ function App() {
         }
         updateLoadingStep('config', 'completed');
         
-        // Etapa 2: Carregar ordens do banco
+        // Etapa 2: Carregar ordens do banco (detectar erro de conexão)
         updateLoadingStep('orders', 'loading');
-        await loadOrdersFromAPI();
-        updateLoadingStep('orders', 'completed');
+        let connectionFailed = false;
+        
+        try {
+          // Tentar conectar ao backend
+          const response = await fetch(`${API_BASE_URL}/api/orders/open?t=${Date.now()}`, {
+            timeout: 5000 // 5 segundos de timeout
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Servidor retornou status ${response.status}`);
+          }
+          
+          const result = await response.json();
+          
+          if (result.success && result.dataSource === 'sql_server') {
+            // Conexão SQL Server bem-sucedida
+            await loadOrdersFromAPI();
+            updateLoadingStep('orders', 'completed');
+          } else {
+            // Fallback para mock data mas sem erro crítico
+            await loadOrdersFromAPI();
+            updateLoadingStep('orders', 'completed');
+          }
+        } catch (error) {
+          // Erro de conexão com backend
+          console.error('❌ Erro de conexão com backend:', error);
+          connectionFailed = true;
+          updateLoadingStep('orders', 'error');
+          setLoadingHasError(true);
+          setLoadingErrorMessage('Não foi possível conectar ao servidor backend. O sistema será iniciado com dados de demonstração.');
+          
+          // Ainda tentar carregar dados mock
+          await loadOrdersFromAPI();
+        }
+        
+        // Se houver erro de conexão, não continuar automaticamente
+        if (connectionFailed) {
+          // Marcar etapas restantes como pendentes mas não executar
+          setLoadingSteps(prev => prev.map(step => {
+            if (['team', 'filters', 'complete'].includes(step.id)) {
+              return { ...step, status: 'skipped' };
+            }
+            return step;
+          }));
+          return; // Parar aqui e aguardar confirmação do usuário
+        }
         
         // Etapa 3: Carregar dados da equipe
         updateLoadingStep('team', 'loading');
@@ -1549,10 +1842,9 @@ function App() {
         
       } catch (error) {
         console.error('❌ Erro durante inicialização:', error);
-        // Em caso de erro, ainda assim fechar o modal após um tempo
-        setTimeout(() => {
-          setIsInitialLoading(false);
-        }, 2000);
+        updateLoadingStep('orders', 'error');
+        setLoadingHasError(true);
+        setLoadingErrorMessage('Erro inesperado durante a inicialização do sistema.');
       }
     };
 
@@ -6566,6 +6858,12 @@ function App() {
               Banco de dados
             </button>
             <button 
+              className={`config-nav-item ${activeConfigSection === 'process' ? 'active' : ''}`}
+              onClick={() => setActiveConfigSection('process')}
+            >
+              Processos
+            </button>
+            <button 
               className={`config-nav-item ${activeConfigSection === 'users' ? 'active' : ''}`}
               onClick={() => setActiveConfigSection('users')}
             >
@@ -6587,6 +6885,12 @@ function App() {
             connectionTested={connectionTested}
             setConnectionTested={setConnectionTested}
           />
+        </div>
+      )}
+
+      {showConfigMenu && activeConfigSection === 'process' && (
+        <div className="config-content">
+          <ProcessConfig />
         </div>
       )}
 
@@ -7377,10 +7681,14 @@ function App() {
       <InitialLoadingModal 
         isOpen={isInitialLoading}
         steps={loadingSteps}
+        hasError={loadingHasError}
+        errorMessage={loadingErrorMessage}
+        onContinue={() => setIsInitialLoading(false)}
       />
     </>
   );
 }
 
 export default App;
+
 

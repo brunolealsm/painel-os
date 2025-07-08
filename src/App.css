@@ -1449,7 +1449,7 @@ body {
 
 /* Formulário de configuração do banco */
 .database-config {
-  max-width: 600px;
+  max-width: 350px;
   background: white;
   border-radius: 8px;
   padding: 24px;
@@ -1549,6 +1549,33 @@ body {
   background: #e2e8f0;
   color: #a0aec0;
   cursor: not-allowed;
+}
+
+/* Estilos específicos para o ProcessConfig */
+.process-input {
+  text-transform: uppercase;
+  text-align: center;
+  font-weight: bold;
+  letter-spacing: 1px;
+  width: 50px;
+  max-width: 50px;
+  min-width: 50px;
+  font-size: 16px;
+}
+
+.form-help {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+  font-style: italic;
 }
 
 .connection-status {
@@ -5426,6 +5453,10 @@ body {
   color: white;
 }
 
+.loading-header.error {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
 .loading-logo {
   width: 64px;
   height: 64px;
@@ -5455,16 +5486,40 @@ body {
   opacity: 0.9;
 }
 
+.loading-error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0 24px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.error-icon {
+  color: #dc2626;
+  font-size: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.error-text {
+  color: #7f1d1d;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .loading-steps {
-  padding: 16px 32px;
-  max-height: 240px;
+  padding: 12px 32px;
+  max-height: 280px;
   overflow-y: auto;
 }
 
 .loading-step {
   display: flex;
   align-items: center;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid #f1f5f9;
   transition: all 0.3s ease;
 }
@@ -5474,48 +5529,50 @@ body {
 }
 
 .step-number {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: #f1f5f9;
   color: #64748b;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  margin-right: 12px;
+  margin-right: 10px;
   transition: all 0.3s ease;
 }
 
 .step-content {
   flex: 1;
-  margin-right: 12px;
+  margin-right: 10px;
 }
 
 .step-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #1e293b;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
+  line-height: 1.2;
 }
 
 .step-status {
-  font-size: 11px;
+  font-size: 10px;
   color: #64748b;
   font-weight: 400;
+  line-height: 1.1;
 }
 
 .step-icon-container {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .step-icon {
-  font-size: 18px;
+  font-size: 16px;
   transition: all 0.3s ease;
 }
 
@@ -5531,12 +5588,20 @@ body {
   color: #10b981;
 }
 
+.step-icon.error {
+  color: #ef4444;
+}
+
+.step-icon.skipped {
+  color: #94a3b8;
+}
+
 /* Estados das etapas */
 .loading-step.step-loading {
   background: rgba(59, 130, 246, 0.05);
-  border-radius: 8px;
-  padding: 10px 8px;
-  margin: 2px 0;
+  border-radius: 6px;
+  padding: 8px 6px;
+  margin: 1px 0;
 }
 
 .loading-step.step-loading .step-number {
@@ -5562,8 +5627,38 @@ body {
   color: #059669;
 }
 
+.loading-step.step-error {
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 6px;
+  padding: 8px 6px;
+  margin: 1px 0;
+}
+
+.loading-step.step-error .step-number {
+  background: #ef4444;
+  color: white;
+}
+
+.loading-step.step-error .step-title {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.loading-step.step-skipped {
+  opacity: 0.5;
+}
+
+.loading-step.step-skipped .step-number {
+  background: #94a3b8;
+  color: white;
+}
+
+.loading-step.step-skipped .step-title {
+  color: #64748b;
+}
+
 .loading-footer {
-  padding: 16px 32px 20px;
+  padding: 12px 32px 16px;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
 }
@@ -5574,11 +5669,11 @@ body {
 
 .progress-bar {
   width: 100%;
-  height: 6px;
+  height: 4px;
   background: #e2e8f0;
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .progress-fill {
@@ -5587,6 +5682,10 @@ body {
   border-radius: 4px;
   transition: width 0.5s ease;
   position: relative;
+}
+
+.progress-fill.error {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
 }
 
 .progress-fill::after {
@@ -5604,6 +5703,35 @@ body {
   font-size: 14px;
   color: #64748b;
   font-weight: 500;
+}
+
+.loading-actions {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.btn-continue {
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-continue:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.btn-continue i {
+  font-size: 12px;
 }
 
 /* Animações */
@@ -5682,30 +5810,44 @@ body {
   }
   
   .loading-steps {
-    padding: 12px 20px;
+    padding: 8px 16px;
   }
   
   .loading-step {
-    padding: 8px 0;
+    padding: 6px 0;
   }
   
   .step-number {
-    width: 24px;
-    height: 24px;
-    font-size: 11px;
-    margin-right: 10px;
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+    margin-right: 8px;
   }
   
   .step-title {
-    font-size: 13px;
+    font-size: 12px;
   }
   
   .step-status {
-    font-size: 10px;
+    font-size: 9px;
   }
   
   .loading-footer {
-    padding: 12px 20px 16px;
+    padding: 10px 16px 12px;
+  }
+  
+  .loading-error-message {
+    margin: 0 16px 8px;
+    padding: 8px 10px;
+  }
+  
+  .error-text {
+    font-size: 11px;
+  }
+  
+  .btn-continue {
+    padding: 8px 16px;
+    font-size: 13px;
   }
 }
 
