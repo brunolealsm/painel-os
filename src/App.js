@@ -2225,6 +2225,32 @@ function App() {
            selectedFilterItems.tecnico.length > 0;
   };
 
+  // Função auxiliar para mapear nome do técnico para ID numérico do banco de dados
+  const getTechnicianIdByName = React.useCallback((technicianName) => {
+    const tecnico = teamData.tecnicos.find(t => t.nome === technicianName);
+    if (tecnico) {
+      // Retornar o ID numérico do técnico para usar no filtro do banco de dados
+      // Assumindo que o ID do teamData corresponde ao TB02115_CODTEC
+      return tecnico.id;
+    }
+    
+    // Se não encontrar no teamData, tentar usar o nome como ID (caso seja um ID numérico)
+    if (/^\d+$/.test(technicianName)) {
+      console.log(`🔍 Usando "${technicianName}" como ID numérico diretamente`);
+      return technicianName;
+    }
+    
+    // Se não encontrar no teamData e não for um ID numérico, retornar null para pular
+    console.warn(`⚠️ Técnico "${technicianName}" não encontrado no teamData e não é um ID numérico`);
+    return null;
+  }, [teamData]);
+
+  // Função auxiliar para mapear ID do técnico de volta para nome
+  const getTechnicianNameById = React.useCallback((technicianId) => {
+    const tecnico = teamData.tecnicos.find(t => t.id === technicianId);
+    return tecnico ? tecnico.nome : technicianId; // Se não encontrar, retorna o ID como fallback
+  }, [teamData]);
+
   // Função para obter técnicos baseado nos filtros aplicados usando relacionamentos da equipe
   const getFilteredTechnicians = React.useMemo(() => {
     // Se não há filtros de equipe ativos, não mostrar técnicos
@@ -2283,21 +2309,59 @@ function App() {
       allFilteredTechnicians = [...allFilteredTechnicians, ...techsFromCoords];
     }
 
-    // Remover duplicatas e retornar a lista final
-    const uniqueFilteredTechnicians = [...new Set(allFilteredTechnicians)];
+    // Remover duplicatas dos nomes e retornar os nomes (não IDs) para exibição
+    const uniqueFilteredTechnicianNames = [...new Set(allFilteredTechnicians)];
 
     console.log('🔍 Filtros ativos - Coordenador:', selectedFilterItems.coordenador);
     console.log('🔍 Filtros ativos - Área:', selectedFilterItems.area);
     console.log('🔍 Filtros ativos - Técnico:', selectedFilterItems.tecnico);
     console.log('🔍 Técnicos das áreas dos coordenadores encontrados:', selectedFilterItems.coordenador.length > 0 ? 'Verificando...' : 'N/A');
-    console.log('🔍 Técnicos filtrados resultantes:', uniqueFilteredTechnicians);
+    console.log('🔍 Técnicos filtrados (nomes):', uniqueFilteredTechnicianNames);
 
-    return uniqueFilteredTechnicians;
+    return uniqueFilteredTechnicianNames;
   }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData]);
 
   const getVisibleTechniques = React.useMemo(() => {
     return getFilteredTechnicians;
   }, [getFilteredTechnicians]);
+
+  // Função para carregar dados dos técnicos da API
+  const loadTechnicianData = async (technicianName) => {
+    try {
+      // Converter nome para ID antes da chamada da API
+      const technicianId = technicianName ? getTechnicianIdByName(technicianName) : null;
+      
+      console.log(`🔄 Carregando dados dos técnicos da API ${technicianName ? `para técnico "${technicianName}" (ID: ${technicianId})` : 'para todos'}...`);
+      
+      const url = technicianId 
+        ? `${API_BASE_URL}/api/orders/technicians?technicianId=${encodeURIComponent(technicianId)}`
+        : `${API_BASE_URL}/api/orders/technicians`;
+      
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ Dados dos técnicos carregados ${technicianName ? `para técnico "${technicianName}" (ID: ${technicianId})` : 'para todos'}:`, result.data);
+        return result.data;
+      } else {
+        console.error('❌ Erro ao carregar dados dos técnicos:', result.message);
+        return {
+          'Em serviço': [],
+          'Previsto para hoje': [],
+          'Previstas para amanhã': [],
+          'Futura': []
+        };
+      }
+    } catch (error) {
+      console.error('❌ Erro na requisição dos dados dos técnicos:', error);
+      return {
+        'Em serviço': [],
+        'Previsto para hoje': [],
+        'Previstas para amanhã': [],
+        'Futura': []
+      };
+    }
+  };
 
   // Inicializar colunas de técnicos quando os filtros mudarem
   React.useEffect(() => {
@@ -2311,41 +2375,45 @@ function App() {
     if (currentTechsString !== newTechsString) {
       console.log('🔄 Lista de técnicos mudou, atualizando colunas');
       
-      const newTechniqueColumns = {};
-      const newTechnicianGroups = {};
-      
-      visibleTechs.forEach((tech, index) => {
-        // Preservar dados existentes se o técnico já tinha uma coluna
-        if (techniqueColumns[tech]) {
-          newTechniqueColumns[tech] = techniqueColumns[tech];
-        } else {
-          newTechniqueColumns[tech] = [];
-        }
+      const initializeTechnicians = async () => {
+        const newTechniqueColumns = {};
+        const newTechnicianGroups = {};
         
-        // Preservar grupos existentes se o técnico já tinha grupos
-        if (technicianGroups[tech]) {
-          newTechnicianGroups[tech] = technicianGroups[tech];
-        } else {
-          // Inicializar grupos vazios para técnico novo (sem dados mock)
-          newTechnicianGroups[tech] = {
-            'Em serviço': [],
-            'Previsto para hoje': [],
-            'Previstas para amanhã': [],
-            'Futura': []
-          };
+        // Carregar dados específicos para cada técnico
+        for (const techName of visibleTechs) {
+          // Preservar dados existentes se o técnico já tinha uma coluna
+          if (techniqueColumns[techName]) {
+            newTechniqueColumns[techName] = techniqueColumns[techName];
+          } else {
+            newTechniqueColumns[techName] = [];
+          }
+          
+          // Preservar grupos existentes se o técnico já tinha grupos
+          if (technicianGroups[techName]) {
+            newTechnicianGroups[techName] = technicianGroups[techName];
+          } else {
+            // Carregar dados específicos do técnico da API
+            console.log(`🔄 Carregando dados do técnico "${techName}"...`);
+            const technicianData = await loadTechnicianData(techName);
+            
+            // Inicializar grupos com dados da API específicos do técnico
+            newTechnicianGroups[techName] = technicianData;
+          }
         }
-      });
 
-      // Atualizar estados
-      setTechniqueColumns(newTechniqueColumns);
-      setTechnicianGroups(newTechnicianGroups);
-      setColumnOrder(visibleTechs);
+        // Atualizar estados
+        setTechniqueColumns(newTechniqueColumns);
+        setTechnicianGroups(newTechnicianGroups);
+        setColumnOrder(visibleTechs);
+        
+        console.log('✅ Colunas de técnicos atualizadas:', visibleTechs);
+      };
       
-      console.log('✅ Colunas de técnicos atualizadas:', visibleTechs);
+      initializeTechnicians();
     } else {
       console.log('📋 Lista de técnicos não mudou, mantendo colunas atuais');
     }
-  }, [getVisibleTechniques]);
+  }, [getVisibleTechniques, techniqueColumns, technicianGroups, columnOrder, getTechnicianIdByName]);
 
   // Carregar configuração salva do banco de dados
   React.useEffect(() => {
