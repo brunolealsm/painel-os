@@ -18,155 +18,10 @@ import './App.css';
 // Configuração da API
 const API_BASE_URL = 'http://localhost:3001';
 
-// Mock data simulando dados reais da consulta SQL
-const mockData = {
-  coordenadores: ['João Silva', 'Maria Santos', 'Pedro Costa'],
-  areas: {
-    'João Silva': ['Área Norte', 'Área Central'],
-    'Maria Santos': ['Área Sul', 'Área Oeste'],
-    'Pedro Costa': ['Área Leste']
-  },
-  tecnicos: {
-    'João Silva': ['Carlos Mendes', 'Ana Paula'],
-    'Maria Santos': ['Roberto Lima', 'Fernanda Costa'],
-    'Pedro Costa': ['Lucas Oliveira']
-  }
-};
+// Mock data removido - agora usando dados reais da base de dados
 
-// Dados de ordens baseados na consulta SQL LCMY_ASSTEC01
-const availableOrders = [
-  {
-    cidade: 'São Paulo', // TB02115_CIDADE
-    ordens: [
-      {
-        TB02115_CODIGO: 'OS-2024001',
-        TB01008_NOME: 'Empresa ABC Ltda',
-        TB01010_NOME: 'Impressora HP LaserJet Pro M404',
-        TB02115_PREVENTIVA: 'N', // NORMAL
-        CALC_RESTANTE: 12, // SLA Vencido (vermelho)
-        sla: 'vencido',
-        ENDERECO: 'Av. Paulista, 1578, Bela Vista, São Paulo, SP',
-        pedidoVinculado: 'PED-2024-1001',
-        notaFiscal: 'NF-2024-0001',
-        produtos: [
-          { codigo: 'TN-001', referencia: 'HP-CF258A', nome: 'Toner HP LaserJet 58A Original - 3.000 páginas', quantidade: 2 },
-          { codigo: 'CL-002', referencia: 'HP-CF257A', nome: 'Cilindro HP LaserJet 57A Original - 80.000 páginas', quantidade: 1 },
-          { codigo: 'KIT-003', referencia: 'HP-MAINT', nome: 'Kit Manutenção HP LaserJet Pro M404', quantidade: 1 }
-        ]
-      },
-      {
-        TB02115_CODIGO: 'OS-2024002',
-        TB01008_NOME: 'Construtora XYZ S.A.',
-        TB01010_NOME: 'Multifuncional Canon ImageRunner',
-        TB02115_PREVENTIVA: 'I', // INSTALAÇÃO
-        CALC_RESTANTE: 36, // SLA à vencer (amarelo)
-        sla: 'vencendo',
-        ENDERECO: 'Rua Oscar Freire, 379, Jardins, São Paulo, SP'
-      },
-      {
-        TB02115_CODIGO: 'OS-2024003',
-        TB01008_NOME: 'Shopping Center Norte',
-        TB01010_NOME: 'Sistema de Som Bose',
-        TB02115_PREVENTIVA: 'S', // PREVENTIVA
-        CALC_RESTANTE: 72, // SLA futuro (sem bolinha)
-        sla: 'ok',
-        ENDERECO: 'Travessa Casalbuono, 120, Vila Guilherme, São Paulo, SP',
-        pedidoVinculado: 'PED-2024-1003',
-        notaFiscal: 'NF-2024-0003',
-        produtos: []
-      },
-      {
-        TB02115_CODIGO: 'OS-2024004',
-        TB01008_NOME: 'Clínica Médica Central',
-        TB01010_NOME: 'Impressora Epson EcoTank',
-        TB02115_PREVENTIVA: 'D', // DESINSTALAÇÃO
-        CALC_RESTANTE: 8, // SLA Vencido (vermelho)
-        sla: 'vencido',
-        ENDERECO: 'Rua Dr. Enéas de Carvalho Aguiar, 255, Cerqueira César, São Paulo, SP'
-      }
-    ]
-  },
-  {
-    cidade: 'Rio de Janeiro', // TB02115_CIDADE
-    ordens: [
-      {
-        TB02115_CODIGO: 'OS-2024005',
-        TB01008_NOME: 'Hotel Copacabana Palace',
-        TB01010_NOME: 'Impressora Brother HL-L2350DW',
-        TB02115_PREVENTIVA: 'A', // AFERIÇÃO
-        CALC_RESTANTE: 18, // SLA Vencido (vermelho)
-        sla: 'vencido',
-        ENDERECO: 'Av. Atlântica, 1702, Copacabana, Rio de Janeiro, RJ',
-        pedidoVinculado: 'PED-2024-1005',
-        notaFiscal: '',
-        produtos: [
-          { codigo: 'TN-201', referencia: 'BR-TN2370', nome: 'Toner Brother TN-2370 Original - 2.600 páginas', quantidade: 3 },
-          { codigo: 'DR-202', referencia: 'BR-DR2340', nome: 'Cilindro Brother DR-2340 Original - 12.000 páginas', quantidade: 1 }
-        ]
-      },
-      {
-        TB02115_CODIGO: 'OS-2024006',
-        TB01008_NOME: 'Cristo Redentor',
-        TB01010_NOME: 'Sistema de Iluminação LED',
-        TB02115_PREVENTIVA: 'B', // BALCÃO
-        CALC_RESTANTE: 45, // SLA à vencer (amarelo)
-        sla: 'vencendo',
-        ENDERECO: 'Parque Nacional da Tijuca, Alto da Boa Vista, Rio de Janeiro, RJ'
-      },
-      {
-        TB02115_CODIGO: 'OS-2024007',
-        TB01008_NOME: 'Farmácia São José',
-        TB01010_NOME: 'Leitor de Código de Barras',
-        TB02115_PREVENTIVA: 'R', // RETORNO-RECARGA
-        CALC_RESTANTE: 96, // SLA futuro (sem bolinha)
-        sla: 'ok',
-        ENDERECO: 'Rua Barata Ribeiro, 200, Copacabana, Rio de Janeiro, RJ'
-      }
-    ]
-  },
-  {
-    cidade: 'Belo Horizonte', // TB02115_CIDADE
-    ordens: [
-      {
-        TB02115_CODIGO: 'OS-2024008',
-        TB01008_NOME: 'Mineradora Vale do Aço',
-        TB01010_NOME: 'Impressora Industrial Zebra',
-        TB02115_PREVENTIVA: 'E', // ESTOQUE
-        CALC_RESTANTE: 30, // SLA à vencer (amarelo)
-        sla: 'vencendo'
-      },
-      {
-        TB02115_CODIGO: 'OS-2024009',
-        TB01008_NOME: 'Universidade Federal MG',
-        TB01010_NOME: 'Projetor Epson PowerLite',
-        TB02115_PREVENTIVA: 'N', // NORMAL
-        CALC_RESTANTE: 120, // SLA futuro (sem bolinha)
-        sla: 'ok'
-      }
-    ]
-  },
-  {
-    cidade: 'Brasília', // TB02115_CIDADE
-    ordens: [
-      {
-        TB02115_CODIGO: 'OS-2024010',
-        TB01008_NOME: 'Ministério da Fazenda',
-        TB01010_NOME: 'Servidor Dell PowerEdge',
-        TB02115_PREVENTIVA: 'S', // PREVENTIVA
-        CALC_RESTANTE: 6, // SLA Vencido (vermelho)
-        sla: 'vencido'
-      },
-      {
-        TB02115_CODIGO: 'OS-2024011',
-        TB01008_NOME: 'Tribunal de Contas União',
-        TB01010_NOME: 'Switch Cisco Catalyst',
-        TB02115_PREVENTIVA: 'I', // INSTALAÇÃO
-        CALC_RESTANTE: 84, // SLA futuro (sem bolinha)
-        sla: 'ok'
-      }
-    ]
-  }
-];
+// Dados de ordens são carregados via API - inicialização vazia
+const availableOrders = [];
 
 // Componente de configuração do banco de dados (movido para fora para evitar recriação)
 const DatabaseConfig = ({ 
@@ -2359,7 +2214,8 @@ function App() {
 
 
   const getAllTechniques = () => {
-    return Object.values(mockData.tecnicos).flat();
+    // Retorna lista vazia - técnicos agora vêm dos dados reais do banco
+    return [];
   };
 
   // Função para verificar se há filtros ativos (coordenador, área ou técnico)
@@ -2470,74 +2326,12 @@ function App() {
         if (technicianGroups[tech]) {
           newTechnicianGroups[tech] = technicianGroups[tech];
         } else {
-          // Inicializar grupos para técnico novo
-          const isFirstTech = index === 0;
+          // Inicializar grupos vazios para técnico novo (sem dados mock)
           newTechnicianGroups[tech] = {
-            'Em serviço': isFirstTech ? [
-              { 
-                id: 'OS-EM001', 
-                tipo: 'N', 
-                cliente: 'Empresa Tech Solutions',
-                equipamento: 'Impressora HP LaserJet Pro',
-                cidade: 'São Paulo',
-                sla: 'ok',
-                emAndamento: true 
-              }
-            ] : [],
-            'Previsto para hoje': isFirstTech ? [
-              { 
-                id: 'OS-HJ001', 
-                tipo: 'I', 
-                cliente: 'Banco Central SP',
-                equipamento: 'ATM Diebold Nixdorf',
-                cidade: 'São Paulo',
-                sla: 'vencendo' 
-              },
-              { 
-                id: 'OS-HJ002', 
-                tipo: 'S', 
-                cliente: 'Hospital Santa Casa',
-                equipamento: 'Monitor Philips IntelliVue',
-                cidade: 'São Paulo',
-                sla: 'ok' 
-              },
-              { 
-                id: 'OS-HJ003', 
-                tipo: 'N', 
-                cliente: 'Loja Magazine Luiza',
-                equipamento: 'POS Ingenico iWL250',
-                cidade: 'Rio de Janeiro',
-                sla: 'vencido' 
-              }
-            ] : [],
-            'Previstas para amanhã': isFirstTech ? [
-              { 
-                id: 'OS-AM001', 
-                tipo: 'D', 
-                cliente: 'Shopping Barra',
-                equipamento: 'Câmera Hikvision DS-2CD',
-                cidade: 'Rio de Janeiro',
-                sla: 'ok' 
-              },
-              { 
-                id: 'OS-AM002', 
-                tipo: 'I', 
-                cliente: 'Vale Mineração',
-                equipamento: 'Tablet Samsung Galaxy Tab',
-                cidade: 'Belo Horizonte',
-                sla: 'ok' 
-              }
-            ] : [],
-            'Futura': isFirstTech ? [
-              { 
-                id: 'OS-FUT001', 
-                tipo: 'S', 
-                cliente: 'Ministério da Fazenda',
-                equipamento: 'Servidor Dell PowerEdge',
-                cidade: 'Brasília',
-                sla: 'ok' 
-              }
-            ] : []
+            'Em serviço': [],
+            'Previsto para hoje': [],
+            'Previstas para amanhã': [],
+            'Futura': []
           };
         }
       });
