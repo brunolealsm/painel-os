@@ -1212,6 +1212,133 @@ function App() {
   
   // Estrutura para agrupamentos de técnicos
   const [technicianGroups, setTechnicianGroups] = useState({});
+  // Cache para dados de técnicos já carregados
+  const [technicianDataCache, setTechnicianDataCache] = useState({});
+  // Mapeamento nome->ID para técnicos com ordens
+  const [technicianNameToIdMap, setTechnicianNameToIdMap] = useState({});
+
+  // Funções auxiliares para conversão entre nome e ID de técnicos
+  const getTechnicianIdByName = React.useCallback((technicianName) => {
+    if (!technicianName) return null;
+    
+    // Primeiro, tentar encontrar na tabela de técnicos cadastrados
+    const tecnico = teamData.tecnicos.find(t => t.nome === technicianName);
+    if (tecnico) {
+      return tecnico.id;
+    }
+    
+    // Se não encontrar, verificar no mapeamento de técnicos com ordens
+    if (technicianNameToIdMap[technicianName]) {
+      console.log(`🔍 Técnico "${technicianName}" encontrado no mapeamento de ordens, ID: ${technicianNameToIdMap[technicianName]}`);
+      return technicianNameToIdMap[technicianName];
+    }
+    
+    console.warn(`⚠️ Técnico "${technicianName}" não encontrado em lugar nenhum`);
+    return null;
+  }, [teamData, technicianNameToIdMap]);
+
+  const getTechnicianNameById = React.useCallback((technicianId) => {
+    if (!technicianId) return null;
+    
+    const tecnico = teamData.tecnicos.find(t => t.id === technicianId);
+    if (tecnico) {
+      return tecnico.nome;
+    }
+    
+    // Se não encontrar na tabela de técnicos, retornar null
+    // Os nomes reais agora vêm da API /api/orders/technicians/available
+    console.log(`⚠️ Técnico ID "${technicianId}" não encontrado na tabela TB01024`);
+    return null;
+  }, [teamData]);
+
+  // Função OTIMIZADA para pré-carregar dados apenas dos técnicos com ordens de serviço
+  const preloadAllTechnicianData = React.useCallback(async () => {
+    try {
+      console.log('🔄 Pré-carregando dados de técnicos com ordens de serviço...');
+      
+      // ETAPA 1: Obter apenas técnicos que possuem ordens de serviço COM NOMES REAIS
+      console.log('🔄 [1/3] Buscando técnicos com ordens de serviço...');
+      const availableResponse = await fetch(`${API_BASE_URL}/api/orders/technicians/available`);
+      const availableResult = await availableResponse.json();
+      
+      if (!availableResult.success || availableResult.data.length === 0) {
+        console.log('⚠️ Nenhum técnico com ordens de serviço encontrado');
+        return {};
+      }
+      
+      const techniciansWithOrders = availableResult.data;
+      console.log(`✅ ${techniciansWithOrders.length} técnicos com ordens encontrados:`, 
+        techniciansWithOrders.map(t => `${t.technicianName} (ID: ${t.technicianId}, ${t.orderCount} ordens)`));
+      
+      // ETAPA 2: Usar nomes reais vindos da API (não precisa mais mapear)
+      const technicianCache = {};
+      const nameToIdMapping = {};
+      const validTechnicians = techniciansWithOrders.map(tech => {
+        // Criar mapeamento nome->ID para técnicos com ordens
+        nameToIdMapping[tech.technicianName] = tech.technicianId;
+        return {
+          id: tech.technicianId,
+          name: tech.technicianName,
+          orderCount: tech.orderCount
+        };
+      });
+      
+      console.log(`🔄 [2/3] Carregando dados para ${validTechnicians.length} técnicos válidos...`);
+      
+      // ETAPA 3: Carregar dados apenas para técnicos com ordens
+      const promises = validTechnicians.map(async (tech) => {
+        try {
+          console.log(`🔄 Carregando dados para técnico "${tech.name}" (ID: ${tech.id}, ${tech.orderCount} ordens)`);
+          
+          const url = `${API_BASE_URL}/api/orders/technicians?technicianId=${encodeURIComponent(tech.id)}`;
+          const response = await fetch(url);
+          const result = await response.json();
+          
+          if (result.success) {
+            console.log(`✅ Dados carregados para técnico "${tech.name}":`, result.data);
+            technicianCache[tech.name] = result.data;
+          } else {
+            console.error(`❌ Erro ao carregar dados do técnico "${tech.name}":`, result.message);
+            technicianCache[tech.name] = {
+              'Em serviço': [],
+              'Previsto para hoje': [],
+              'Previstas para amanhã': [],
+              'Futura': []
+            };
+          }
+        } catch (error) {
+          console.error(`❌ Erro na requisição para técnico "${tech.name}":`, error);
+          technicianCache[tech.name] = {
+            'Em serviço': [],
+            'Previsto para hoje': [],
+            'Previstas para amanhã': [],
+            'Futura': []
+          };
+        }
+      });
+      
+      // Executar todas as requisições em paralelo
+      await Promise.all(promises);
+      
+      // Atualizar o cache e o mapeamento
+      setTechnicianDataCache(technicianCache);
+      setTechnicianNameToIdMap(nameToIdMapping);
+      
+      console.log(`✅ Cache de técnicos preenchido com ${Object.keys(technicianCache).length} técnicos com ordens`);
+      console.log(`🎯 PERFORMANCE: Otimização aplicada - apenas ${Object.keys(technicianCache).length} técnicos carregados (em vez de ${teamData.tecnicos.length} total)`);
+      console.log('🔍 DEBUG: Cache preenchido com dados:', technicianCache);
+      console.log('🔍 DEBUG: Mapeamento nome->ID:', nameToIdMapping);
+      
+      return technicianCache;
+      
+    } catch (error) {
+      console.error('❌ Erro no pré-carregamento otimizado dos técnicos:', error);
+      return {};
+    }
+  }, [teamData]);
+
+  // Estado para indicar se está carregando colunas de técnicos
+  const [isLoadingTechnicianColumns, setIsLoadingTechnicianColumns] = useState(false);
   const [filterSearchTerms, setFilterSearchTerms] = useState({
     coordenador: '',
     area: '',
@@ -1255,7 +1382,7 @@ function App() {
     { id: 'config', name: 'Carregando configuração', status: 'pending' },
     { id: 'orders', name: 'Conectando ao banco de dados', status: 'pending' },
     { id: 'team', name: 'Carregando dados da equipe', status: 'pending' },
-    { id: 'filters', name: 'Aplicando filtros iniciais', status: 'pending' },
+    { id: 'filters', name: 'Otimizando técnicos com ordens', status: 'pending' },
     { id: 'complete', name: 'Finalizando carregamento', status: 'pending' }
   ]);
   const [loadingHasError, setLoadingHasError] = useState(false);
@@ -1609,11 +1736,18 @@ function App() {
         const savedConfig = localStorage.getItem('dbConfig');
         if (savedConfig) {
           try {
-            const config = JSON.parse(savedConfig);
-            setDbConfig(config);
-            console.log('📋 Configuração carregada do localStorage');
+            // Verificar se o savedConfig é um JSON válido antes de fazer parse
+            if (savedConfig.trim().startsWith('{') && savedConfig.trim().endsWith('}')) {
+              const config = JSON.parse(savedConfig);
+              setDbConfig(config);
+              console.log('📋 Configuração carregada do localStorage');
+            } else {
+              console.warn('⚠️ Configuração salva não é um JSON válido, ignorando:', savedConfig.substring(0, 50));
+              localStorage.removeItem('dbConfig'); // Limpar configuração inválida
+            }
           } catch (error) {
             console.error('❌ Erro ao carregar configuração do localStorage:', error);
+            localStorage.removeItem('dbConfig'); // Limpar configuração corrompida
           }
         }
         updateLoadingStep('config', 'completed');
@@ -1680,9 +1814,21 @@ function App() {
         ]);
         updateLoadingStep('team', 'completed');
         
-        // Etapa 4: Aplicar filtros iniciais
+        // Etapa 4: Pré-carregar técnicos com ordens de serviço
         updateLoadingStep('filters', 'loading');
+        console.log('🔄 Pré-carregando técnicos com ordens de serviço...');
+        
+        // Aguardar um pouco para garantir que os dados da equipe foram processados
         await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Executar o pré-carregamento otimizado
+        try {
+          await preloadAllTechnicianData();
+          console.log('✅ Pré-carregamento de técnicos concluído durante inicialização');
+        } catch (error) {
+          console.error('❌ Erro no pré-carregamento de técnicos durante inicialização:', error);
+        }
+        
         updateLoadingStep('filters', 'completed');
         
         // Etapa 5: Finalizar
@@ -1716,51 +1862,23 @@ function App() {
     }
   }, [connectionStatus, loadOrdersFromAPI]);
 
-  // Carregar técnicos, áreas e coordenadores quando navegar para a seção Equipe ou Board
-  // (Comentado pois agora os dados são carregados no useEffect inicial)
-  /*
+  // Pré-carregar dados dos técnicos quando teamData estiver disponível
   useEffect(() => {
-    if (activeSection === 'Equipe' || activeSection === 'Board') {
-      const loadTeamData = async () => {
-        const totalStartTime = performance.now();
-        const totalStartTimestamp = new Date().toLocaleTimeString();
-        console.log('🎯 PERFORMANCE LOG - Iniciando carregamento completo da equipe:', totalStartTimestamp);
-        
-        // Carregar técnicos, áreas e coordenadores em paralelo
-        console.log('🔄 ETAPA 1/2: Carregando dados básicos da equipe em paralelo...');
-        const basicDataStart = performance.now();
-        
-        await Promise.all([
-          loadTechniciansFromAPI(),
-          loadAreasFromAPI(),
-          loadCoordinatorsFromAPI()
-        ]);
-        
-        const basicDataEnd = performance.now();
-        console.log(`⏱️ ETAPA 1/2: Dados básicos carregados em: ${(basicDataEnd - basicDataStart).toFixed(2)}ms`);
-        
-        // Depois carregar os vínculos para aplicar aos técnicos e áreas
-        console.log('🔄 ETAPA 2/2: Carregando vínculos em paralelo...');
-        const linksDataStart = performance.now();
-        
-        await Promise.all([
-          loadAreaTeamFromAPI(),
-          loadAreaCoordFromAPI()
-        ]);
-        
-        const linksDataEnd = performance.now();
-        console.log(`⏱️ ETAPA 2/2: Vínculos carregados em: ${(linksDataEnd - linksDataStart).toFixed(2)}ms`);
-        
-        const totalEndTime = performance.now();
-        console.log(`🏆 PERFORMANCE TOTAL - Carregamento completo da equipe finalizado: ${new Date().toLocaleTimeString()}`);
-        console.log(`📊 TEMPO TOTAL: ${(totalEndTime - totalStartTime).toFixed(2)}ms (${((totalEndTime - totalStartTime) / 1000).toFixed(2)}s)`);
-        console.log(`📈 BREAKDOWN: Dados básicos: ${(basicDataEnd - basicDataStart).toFixed(2)}ms | Vínculos: ${(linksDataEnd - linksDataStart).toFixed(2)}ms`);
-      };
+    if (teamData && teamData.tecnicos && teamData.tecnicos.length > 0 && !isInitialLoading) {
+      console.log('🔄 teamData disponível, iniciando pré-carregamento de técnicos...');
       
-      loadTeamData();
+      // Só executar se o cache ainda não foi preenchido
+      if (!technicianDataCache || Object.keys(technicianDataCache).length === 0) {
+        preloadAllTechnicianData()
+          .then(() => {
+            console.log('✅ Pré-carregamento de técnicos concluído');
+          })
+          .catch(error => {
+            console.error('❌ Erro no pré-carregamento de técnicos:', error);
+          });
+      }
     }
-  }, [activeSection, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI]);
-  */
+  }, [teamData, technicianDataCache, isInitialLoading, preloadAllTechnicianData]);
 
   // Função para mapear tipo de serviço baseado em TB02115_PREVENTIVA
   const getServiceTypeFromPreventiva = (preventiva) => {
@@ -1843,17 +1961,141 @@ function App() {
   };
 
   // Abordagem simples sem estados complexos
+
+
   // Função para aplicar filtros automáticos quando um filtro é selecionado
   const applyAutomaticFilters = (type, newSelection) => {
     console.log('🔍 applyAutomaticFilters called with type:', type, 'newSelection:', newSelection);
     console.log('🔍 current selectedFilterItems:', selectedFilterItems);
     
-    // Por ora, retornar filtros vazios para não interferir com a seleção
-    // A lógica de filtros automáticos será aplicada apenas na renderização das opções
-    const emptyFilters = {};
+    let updatedFilters = {};
     
-    console.log('🔍 applyAutomaticFilters returning (simplified):', emptyFilters);
-    return emptyFilters;
+    // Quando um coordenador é selecionado/desmarcado, sincronizar técnicos automaticamente
+    if (type === 'coordenador') {
+      const technicosToAdd = [];
+      
+      // Para cada coordenador selecionado, obter todos os técnicos vinculados
+      newSelection.forEach(coordenadorNome => {
+        const coord = teamData.coordenadores.find(c => c.nome === coordenadorNome);
+        if (coord) {
+          // Encontrar áreas deste coordenador
+          const coordAreas = teamData.areas.filter(area => area.coordenadorId === coord.id);
+          
+          // Para cada área, encontrar técnicos
+          coordAreas.forEach(area => {
+            const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
+            tecnicosFromArea.forEach(tec => {
+              if (!technicosToAdd.includes(tec.nome)) {
+                technicosToAdd.push(tec.nome);
+              }
+            });
+          });
+        }
+      });
+      
+      // Manter técnicos já selecionados manualmente (que não pertencem aos coordenadores desmarcados)
+      const coordenadorRemovidos = selectedFilterItems.coordenador.filter(c => !newSelection.includes(c));
+      let technicosToRemove = [];
+      
+      coordenadorRemovidos.forEach(coordenadorNome => {
+        const coord = teamData.coordenadores.find(c => c.nome === coordenadorNome);
+        if (coord) {
+          const coordAreas = teamData.areas.filter(area => area.coordenadorId === coord.id);
+          coordAreas.forEach(area => {
+            const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
+            tecnicosFromArea.forEach(tec => {
+              if (!technicosToRemove.includes(tec.nome)) {
+                technicosToRemove.push(tec.nome);
+              }
+            });
+          });
+        }
+      });
+      
+      // Criar nova lista de técnicos: manter os atuais, adicionar os novos, remover os que não pertencem mais
+      const currentTechnicians = selectedFilterItems.tecnico || [];
+      const newTechnicians = [
+        ...currentTechnicians.filter(t => !technicosToRemove.includes(t)),
+        ...technicosToAdd.filter(t => !currentTechnicians.includes(t))
+      ];
+      
+      updatedFilters.tecnico = newTechnicians;
+      
+      console.log('🔍 Coordenadores selecionados:', newSelection);
+      console.log('🔍 Técnicos adicionados automaticamente:', technicosToAdd);
+      console.log('🔍 Técnicos removidos automaticamente:', technicosToRemove);
+      console.log('🔍 Nova lista de técnicos:', newTechnicians);
+    }
+    
+    // Quando uma área é selecionada/desmarcada, sincronizar técnicos automaticamente
+    if (type === 'area') {
+      const technicosToAdd = [];
+      
+      // Para cada área selecionada, obter todos os técnicos vinculados
+      newSelection.forEach(areaNome => {
+        const area = teamData.areas.find(a => a.nome === areaNome);
+        if (area) {
+          const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
+          tecnicosFromArea.forEach(tec => {
+            if (!technicosToAdd.includes(tec.nome)) {
+              technicosToAdd.push(tec.nome);
+            }
+          });
+        }
+      });
+      
+      // Manter técnicos já selecionados manualmente (que não pertencem às áreas desmarcadas)
+      const areasRemovidas = selectedFilterItems.area.filter(a => !newSelection.includes(a));
+      let technicosToRemove = [];
+      
+      areasRemovidas.forEach(areaNome => {
+        const area = teamData.areas.find(a => a.nome === areaNome);
+        if (area) {
+          const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
+          tecnicosFromArea.forEach(tec => {
+            // Só remover se o técnico não pertence a outras áreas/coordenadores ainda selecionados
+            const pertenceAOutraAreaSelecionada = selectedFilterItems.area.some(otherAreaNome => {
+              if (otherAreaNome === areaNome) return false;
+              const otherArea = teamData.areas.find(a => a.nome === otherAreaNome);
+              return otherArea && teamData.tecnicos.some(t => t.areaId === otherArea.id && t.nome === tec.nome);
+            });
+            
+            const pertenceACoordSelecionado = selectedFilterItems.coordenador.some(coordNome => {
+              const coord = teamData.coordenadores.find(c => c.nome === coordNome);
+              if (!coord) return false;
+              const coordAreas = teamData.areas.filter(a => a.coordenadorId === coord.id);
+              return coordAreas.some(coordArea => 
+                teamData.tecnicos.some(t => t.areaId === coordArea.id && t.nome === tec.nome)
+              );
+            });
+            
+            if (!pertenceAOutraAreaSelecionada && !pertenceACoordSelecionado && !technicosToRemove.includes(tec.nome)) {
+              technicosToRemove.push(tec.nome);
+            }
+          });
+        }
+      });
+      
+      // Criar nova lista de técnicos
+      const currentTechnicians = selectedFilterItems.tecnico || [];
+      const newTechnicians = [
+        ...currentTechnicians.filter(t => !technicosToRemove.includes(t)),
+        ...technicosToAdd.filter(t => !currentTechnicians.includes(t))
+      ];
+      
+      updatedFilters.tecnico = newTechnicians;
+      
+      console.log('🔍 Áreas selecionadas:', newSelection);
+      console.log('🔍 Técnicos adicionados automaticamente:', technicosToAdd);
+      console.log('🔍 Técnicos removidos automaticamente:', technicosToRemove);
+      console.log('🔍 Nova lista de técnicos:', newTechnicians);
+    }
+    
+    // Quando um técnico é selecionado/desmarcado diretamente, manter essa preferência
+    // (não fazer nada adicional, apenas manter a seleção manual)
+    
+    console.log('🔍 applyAutomaticFilters returning:', updatedFilters);
+    return updatedFilters;
   };
 
   const SimpleFilterModal = ({ type, options, onClose }) => {
@@ -1978,20 +2220,28 @@ function App() {
 
 
 
-  // Função para obter opções de filtros interligados
-  const getFilterOptions = (type) => {
-    console.log('🔍 getFilterOptions called for type:', type);
-    console.log('🔍 teamData state:', teamData);
-    
+  // Função para obter opções de filtros interligados (estrutura hierárquica completa) - memoizada
+  const getFilterOptions = React.useCallback((type) => {
     switch(type) {
       case 'coordenador':
-        // Sempre mostrar todos os coordenadores disponíveis
-        const coordOptions = teamData.coordenadores.map(coord => coord.nome);
-        console.log('🔍 coordenador options:', coordOptions);
+        // Mostrar apenas coordenadores que têm áreas vinculadas (com técnicos)
+        const coordenadoresComAreas = teamData.coordenadores.filter(coord => {
+          // Verificar se este coordenador tem áreas vinculadas
+          const areasDoCoord = teamData.areas.filter(area => area.coordenadorId === coord.id);
+          
+          // Verificar se pelo menos uma área tem técnicos vinculados
+          const temTecnicosVinculados = areasDoCoord.some(area => 
+            teamData.tecnicos.some(tec => tec.areaId === area.id)
+          );
+          
+          return areasDoCoord.length > 0 && temTecnicosVinculados;
+        });
+        
+        const coordOptions = coordenadoresComAreas.map(coord => coord.nome);
         return coordOptions;
       
       case 'area':
-        // Se há coordenador selecionado, mostrar apenas suas áreas
+        // Se há coordenador selecionado, mostrar apenas suas áreas que têm técnicos
         if (selectedFilterItems.coordenador.length > 0) {
           const coordenadorNomes = selectedFilterItems.coordenador;
           const coordenadorIds = teamData.coordenadores
@@ -1999,9 +2249,14 @@ function App() {
             .map(coord => coord.id);
           
           const areaOptions = teamData.areas
-            .filter(area => coordenadorIds.includes(area.coordenadorId))
+            .filter(area => {
+              // Área deve pertencer ao coordenador selecionado
+              const pertenceAoCoord = coordenadorIds.includes(area.coordenadorId);
+              // Área deve ter pelo menos um técnico vinculado
+              const temTecnicos = teamData.tecnicos.some(tec => tec.areaId === area.id);
+              return pertenceAoCoord && temTecnicos;
+            })
             .map(area => area.nome);
-          console.log('🔍 area options (coordenador filtrado):', areaOptions);
           return areaOptions;
         }
         
@@ -2017,17 +2272,21 @@ function App() {
             .map(tec => tec.areaId);
           
           const areaOptions = teamData.areas
-            .filter(area => areaIds.includes(area.id))
+            .filter(area => areaIds.includes(area.id) && area.coordenadorId)
             .map(area => area.nome);
-          console.log('🔍 area options (técnico filtrado):', areaOptions);
           return areaOptions;
         }
         
-        // Caso contrário, mostrar apenas áreas que têm coordenador
+        // Caso contrário, mostrar apenas áreas que têm coordenador E técnicos
         const allAreaOptions = teamData.areas
-          .filter(area => area.coordenadorId)
-          .map(area => area.nome);
-        console.log('🔍 area options (todas com coordenador):', allAreaOptions);
+          .filter(area => {
+            // Área deve ter coordenador vinculado
+            const temCoord = area.coordenadorId;
+            // Área deve ter pelo menos um técnico vinculado
+            const temTecnicos = teamData.tecnicos.some(tec => tec.areaId === area.id);
+            return temCoord && temTecnicos;
+          })
+                      .map(area => area.nome);
         return allAreaOptions;
       
       case 'tecnico':
@@ -2042,10 +2301,38 @@ function App() {
             .filter(area => coordenadorIds.includes(area.coordenadorId))
             .map(area => area.id);
           
-          const tecnicoOptions = teamData.tecnicos
+          let tecnicoOptions = teamData.tecnicos
             .filter(tec => areaIds.includes(tec.areaId))
             .map(tec => tec.nome);
-          console.log('🔍 tecnico options (coordenador filtrado):', tecnicoOptions);
+          
+          // Adicionar técnicos com ordens mas não cadastrados (usando nomes reais)
+          // IMPORTANTE: Só adicionar se o técnico pertencer ao coordenador selecionado
+          const technicianCacheKeys = Object.keys(technicianDataCache);
+          technicianCacheKeys.forEach(techName => {
+            if (!tecnicoOptions.includes(techName) && technicianDataCache[techName]) {
+              const hasOrders = Object.values(technicianDataCache[techName]).some(group => group.length > 0);
+              if (hasOrders) {
+                // Verificar se o técnico pertence ao coordenador através do mapeamento
+                const technicianId = technicianNameToIdMap[techName];
+                if (technicianId) {
+                  // Verificar se o técnico está vinculado a alguma área do coordenador
+                  const belongsToCoordinator = teamData.tecnicos.some(tec => 
+                    tec.id === technicianId && areaIds.includes(tec.areaId)
+                  );
+                  
+                  if (belongsToCoordinator) {
+                    console.log(`➕ Adicionando técnico "${techName}" aos filtros do coordenador (pertence ao coordenador)`);
+                    tecnicoOptions.push(techName);
+                  } else {
+                    console.log(`❌ Técnico "${techName}" tem ordens mas não pertence ao coordenador selecionado`);
+                  }
+                } else {
+                  console.log(`❌ Técnico "${techName}" não tem ID mapeado, não pode verificar vinculação`);
+                }
+              }
+            }
+          });
+          
           return tecnicoOptions;
         }
         
@@ -2056,23 +2343,93 @@ function App() {
             .filter(area => areaNomes.includes(area.nome))
             .map(area => area.id);
           
-          const tecnicoOptions = teamData.tecnicos
+          let tecnicoOptions = teamData.tecnicos
             .filter(tec => areaIds.includes(tec.areaId))
             .map(tec => tec.nome);
-          console.log('🔍 tecnico options (área filtrada):', tecnicoOptions);
+          
+          // Adicionar técnicos com ordens mas não cadastrados (usando nomes reais)
+          // IMPORTANTE: Só adicionar se o técnico pertencer à área selecionada
+          const technicianCacheKeys = Object.keys(technicianDataCache);
+          technicianCacheKeys.forEach(techName => {
+            if (!tecnicoOptions.includes(techName) && technicianDataCache[techName]) {
+              const hasOrders = Object.values(technicianDataCache[techName]).some(group => group.length > 0);
+              if (hasOrders) {
+                // Verificar se o técnico pertence à área através do mapeamento
+                const technicianId = technicianNameToIdMap[techName];
+                if (technicianId) {
+                  // Verificar se o técnico está vinculado a alguma área selecionada
+                  const belongsToArea = teamData.tecnicos.some(tec => 
+                    tec.id === technicianId && areaIds.includes(tec.areaId)
+                  );
+                  
+                  if (belongsToArea) {
+                    console.log(`➕ Adicionando técnico "${techName}" aos filtros da área (pertence à área)`);
+                    tecnicoOptions.push(techName);
+                  } else {
+                    console.log(`❌ Técnico "${techName}" tem ordens mas não pertence à área selecionada`);
+                  }
+                } else {
+                  console.log(`❌ Técnico "${techName}" não tem ID mapeado, não pode verificar vinculação`);
+                }
+              }
+            }
+          });
+          
           return tecnicoOptions;
         }
         
-        // Caso contrário, mostrar todos os técnicos
-        const allTecnicoOptions = teamData.tecnicos.map(tec => tec.nome);
-        console.log('🔍 tecnico options (todos):', allTecnicoOptions);
+                // Caso contrário, mostrar apenas técnicos com estrutura hierárquica completa
+        let allTecnicoOptions = teamData.tecnicos
+          .filter(tec => {
+            // Técnico deve ter área vinculada
+            if (!tec.areaId) return false;
+            
+            // A área do técnico deve ter coordenador vinculado
+            const areaDoTecnico = teamData.areas.find(area => area.id === tec.areaId);
+            return areaDoTecnico && areaDoTecnico.coordenadorId;
+          })
+          .map(tec => tec.nome);
+        
+        // NOVIDADE: Adicionar técnicos que têm ordens mas não estão cadastrados (usando nomes reais)
+        // IMPORTANTE: Só adicionar se tiver estrutura hierárquica completa
+        const technicianCacheKeys = Object.keys(technicianDataCache);
+        technicianCacheKeys.forEach(techName => {
+          // Se o técnico não está na lista de cadastrados, mas tem dados em cache
+          if (!allTecnicoOptions.includes(techName) && technicianDataCache[techName]) {
+            // Verificar se o técnico realmente tem ordens
+            const hasOrders = Object.values(technicianDataCache[techName]).some(group => group.length > 0);
+            if (hasOrders) {
+              // Verificar se o técnico tem estrutura hierárquica completa através do mapeamento
+              const technicianId = technicianNameToIdMap[techName];
+              if (technicianId) {
+                // Verificar se o técnico está vinculado a uma área com coordenador
+                const hasCompleteHierarchy = teamData.tecnicos.some(tec => {
+                  if (tec.id === technicianId && tec.areaId) {
+                    const areaDoTecnico = teamData.areas.find(area => area.id === tec.areaId);
+                    return areaDoTecnico && areaDoTecnico.coordenadorId;
+                  }
+                  return false;
+                });
+                
+                if (hasCompleteHierarchy) {
+                  console.log(`➕ Adicionando técnico "${techName}" aos filtros (tem ordens e estrutura hierárquica completa)`);
+                  allTecnicoOptions.push(techName);
+                } else {
+                  console.log(`❌ Técnico "${techName}" tem ordens mas não tem estrutura hierárquica completa`);
+                }
+              } else {
+                console.log(`❌ Técnico "${techName}" não tem ID mapeado, não pode verificar hierarquia`);
+              }
+            }
+          }
+        });
+        
         return allTecnicoOptions;
       
       default:
-        console.log('🔍 default case, returning empty array');
         return [];
     }
-  };
+  }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData, technicianDataCache, technicianNameToIdMap]);
 
   const getFilteredOrders = React.useMemo(() => {
     console.log('🔍 getFilteredOrders - availableOrdersState:', availableOrdersState);
@@ -2218,152 +2575,146 @@ function App() {
     return [];
   };
 
-  // Função para verificar se há filtros ativos (coordenador, área ou técnico)
-  const hasActiveTeamFilters = () => {
+  // Função para verificar se há filtros ativos (coordenador, área ou técnico) - memoizada
+  const hasActiveTeamFilters = React.useMemo(() => {
     return selectedFilterItems.coordenador.length > 0 || 
            selectedFilterItems.area.length > 0 || 
            selectedFilterItems.tecnico.length > 0;
-  };
-
-  // Função auxiliar para mapear nome do técnico para ID numérico do banco de dados
-  const getTechnicianIdByName = React.useCallback((technicianName) => {
-    const tecnico = teamData.tecnicos.find(t => t.nome === technicianName);
-    if (tecnico) {
-      // Retornar o ID numérico do técnico para usar no filtro do banco de dados
-      // Assumindo que o ID do teamData corresponde ao TB02115_CODTEC
-      return tecnico.id;
-    }
-    
-    // Se não encontrar no teamData, tentar usar o nome como ID (caso seja um ID numérico)
-    if (/^\d+$/.test(technicianName)) {
-      console.log(`🔍 Usando "${technicianName}" como ID numérico diretamente`);
-      return technicianName;
-    }
-    
-    // Se não encontrar no teamData e não for um ID numérico, retornar null para pular
-    console.warn(`⚠️ Técnico "${technicianName}" não encontrado no teamData e não é um ID numérico`);
-    return null;
-  }, [teamData]);
-
-  // Função auxiliar para mapear ID do técnico de volta para nome
-  const getTechnicianNameById = React.useCallback((technicianId) => {
-    const tecnico = teamData.tecnicos.find(t => t.id === technicianId);
-    return tecnico ? tecnico.nome : technicianId; // Se não encontrar, retorna o ID como fallback
-  }, [teamData]);
+  }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico]);
 
   // Função para obter técnicos baseado nos filtros aplicados usando relacionamentos da equipe
   const getFilteredTechnicians = React.useMemo(() => {
     // Se não há filtros de equipe ativos, não mostrar técnicos
-    if (!hasActiveTeamFilters()) {
+    if (!hasActiveTeamFilters) {
       return [];
     }
 
-    let allFilteredTechnicians = [];
+    // SEMPRE retornar exatamente os técnicos que estão marcados no filtro
+    // A sincronização automática já garante que quando coordenadores/áreas são selecionados,
+    // os técnicos correspondentes são automaticamente marcados no filtro
+    const filteredTechnicians = selectedFilterItems.tecnico || [];
 
-    // Se filtrou técnicos diretamente
-    if (selectedFilterItems.tecnico.length > 0) {
-      allFilteredTechnicians = [...allFilteredTechnicians, ...selectedFilterItems.tecnico];
+    // Logs apenas quando há mudanças significativas (não em todos os renders)
+    if (filteredTechnicians.length > 0) {
+      console.log('🔍 Técnicos filtrados (exatos do filtro):', filteredTechnicians);
     }
 
-    // Se filtrou áreas, incluir técnicos dessas áreas
-    if (selectedFilterItems.area.length > 0) {
-      const techsFromAreas = [];
-      selectedFilterItems.area.forEach(areaName => {
-        // Encontrar a área no teamData
-        const area = teamData.areas.find(a => a.nome === areaName);
-        if (area) {
-          // Encontrar técnicos vinculados a esta área
-          const areaId = area.id;
-          teamData.tecnicos.forEach(tecnico => {
-            if (tecnico.areaId === areaId && !techsFromAreas.includes(tecnico.nome)) {
-              techsFromAreas.push(tecnico.nome);
-            }
-          });
-        }
-      });
-      allFilteredTechnicians = [...allFilteredTechnicians, ...techsFromAreas];
-    }
+    return filteredTechnicians;
+  }, [selectedFilterItems.tecnico, hasActiveTeamFilters]);
 
-    // Se filtrou coordenadores, incluir técnicos das áreas desses coordenadores
-    if (selectedFilterItems.coordenador.length > 0) {
-      const techsFromCoords = [];
-      selectedFilterItems.coordenador.forEach(coordName => {
-        // Encontrar o coordenador no teamData
-        const coord = teamData.coordenadores.find(c => c.nome === coordName);
-        if (coord) {
-          const coordId = coord.id;
-          // Encontrar áreas deste coordenador
-          const coordAreas = teamData.areas.filter(area => area.coordenadorId === coordId);
-          
-          // Para cada área do coordenador, encontrar técnicos
-          coordAreas.forEach(area => {
-            const areaId = area.id;
-            teamData.tecnicos.forEach(tecnico => {
-              if (tecnico.areaId === areaId && !techsFromCoords.includes(tecnico.nome)) {
-                techsFromCoords.push(tecnico.nome);
-              }
-            });
-          });
-        }
-      });
-      allFilteredTechnicians = [...allFilteredTechnicians, ...techsFromCoords];
-    }
+  // Alias para manter compatibilidade
+  const getVisibleTechniques = getFilteredTechnicians;
 
-    // Remover duplicatas dos nomes e retornar os nomes (não IDs) para exibição
-    const uniqueFilteredTechnicianNames = [...new Set(allFilteredTechnicians)];
-
-    console.log('🔍 Filtros ativos - Coordenador:', selectedFilterItems.coordenador);
-    console.log('🔍 Filtros ativos - Área:', selectedFilterItems.area);
-    console.log('🔍 Filtros ativos - Técnico:', selectedFilterItems.tecnico);
-    console.log('🔍 Técnicos das áreas dos coordenadores encontrados:', selectedFilterItems.coordenador.length > 0 ? 'Verificando...' : 'N/A');
-    console.log('🔍 Técnicos filtrados (nomes):', uniqueFilteredTechnicianNames);
-
-    return uniqueFilteredTechnicianNames;
-  }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData]);
-
-  const getVisibleTechniques = React.useMemo(() => {
-    return getFilteredTechnicians;
-  }, [getFilteredTechnicians]);
-
-  // Função para carregar dados dos técnicos da API
+  // Função OTIMIZADA para carregar dados dos técnicos com carregamento inteligente
   const loadTechnicianData = async (technicianName) => {
     try {
+      // Verificar se já temos dados em cache
+      if (technicianDataCache[technicianName]) {
+        console.log(`⚡ Usando dados em cache para técnico "${technicianName}"`);
+        return technicianDataCache[technicianName];
+      }
+      
       // Converter nome para ID antes da chamada da API
       const technicianId = technicianName ? getTechnicianIdByName(technicianName) : null;
       
-      console.log(`🔄 Carregando dados dos técnicos da API ${technicianName ? `para técnico "${technicianName}" (ID: ${technicianId})` : 'para todos'}...`);
-      
-      const url = technicianId 
-        ? `${API_BASE_URL}/api/orders/technicians?technicianId=${encodeURIComponent(technicianId)}`
-        : `${API_BASE_URL}/api/orders/technicians`;
-      
-      const response = await fetch(url);
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`✅ Dados dos técnicos carregados ${technicianName ? `para técnico "${technicianName}" (ID: ${technicianId})` : 'para todos'}:`, result.data);
-        return result.data;
-      } else {
-        console.error('❌ Erro ao carregar dados dos técnicos:', result.message);
-        return {
+      if (!technicianId) {
+        console.warn(`⚠️ Técnico "${technicianName}" não tem ID válido, usando dados vazios`);
+        const defaultData = {
           'Em serviço': [],
           'Previsto para hoje': [],
           'Previstas para amanhã': [],
           'Futura': []
         };
+        
+        // Salvar dados vazios no cache
+        setTechnicianDataCache(prev => ({
+          ...prev,
+          [technicianName]: defaultData
+        }));
+        
+        return defaultData;
+      }
+      
+      console.log(`🔄 Carregamento sob demanda para técnico "${technicianName}" (ID: ${technicianId})`);
+      
+      // Primeiro verificar se este técnico tem ordens de serviço
+      const availableResponse = await fetch(`${API_BASE_URL}/api/orders/technicians/available`);
+      const availableResult = await availableResponse.json();
+      
+      if (availableResult.success) {
+        const technicianHasOrders = availableResult.data.some(t => t.technicianId === technicianId);
+        
+        if (!technicianHasOrders) {
+          console.log(`💡 Técnico "${technicianName}" não possui ordens de serviço, usando dados vazios`);
+          const defaultData = {
+            'Em serviço': [],
+            'Previsto para hoje': [],
+            'Previstas para amanhã': [],
+            'Futura': []
+          };
+          
+          // Salvar dados vazios no cache
+          setTechnicianDataCache(prev => ({
+            ...prev,
+            [technicianName]: defaultData
+          }));
+          
+          return defaultData;
+        }
+      }
+      
+      // Carregar dados para o técnico
+      const url = `${API_BASE_URL}/api/orders/technicians?technicianId=${encodeURIComponent(technicianId)}`;
+      const response = await fetch(url);
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ Dados carregados sob demanda para técnico "${technicianName}":`, result.data);
+        
+        // Salvar dados no cache
+        setTechnicianDataCache(prev => ({
+          ...prev,
+          [technicianName]: result.data
+        }));
+        
+        return result.data;
+      } else {
+        console.error(`❌ Erro ao carregar dados do técnico "${technicianName}":`, result.message);
+        const defaultData = {
+          'Em serviço': [],
+          'Previsto para hoje': [],
+          'Previstas para amanhã': [],
+          'Futura': []
+        };
+        
+        // Salvar dados vazios no cache para evitar tentativas repetidas
+        setTechnicianDataCache(prev => ({
+          ...prev,
+          [technicianName]: defaultData
+        }));
+        
+        return defaultData;
       }
     } catch (error) {
-      console.error('❌ Erro na requisição dos dados dos técnicos:', error);
-      return {
+      console.error(`❌ Erro na requisição para técnico "${technicianName}":`, error);
+      const defaultData = {
         'Em serviço': [],
         'Previsto para hoje': [],
         'Previstas para amanhã': [],
         'Futura': []
       };
+      
+      // Salvar dados vazios no cache para evitar tentativas repetidas
+      setTechnicianDataCache(prev => ({
+        ...prev,
+        [technicianName]: defaultData
+      }));
+      
+      return defaultData;
     }
   };
 
-  // Inicializar colunas de técnicos quando os filtros mudarem
+  // Inicializar colunas de técnicos quando os filtros mudarem (com debounce)
   React.useEffect(() => {
     const visibleTechs = getVisibleTechniques;
     console.log('🔄 Atualizando colunas de técnicos para:', visibleTechs);
@@ -2375,45 +2726,83 @@ function App() {
     if (currentTechsString !== newTechsString) {
       console.log('🔄 Lista de técnicos mudou, atualizando colunas');
       
-      const initializeTechnicians = async () => {
-        const newTechniqueColumns = {};
-        const newTechnicianGroups = {};
-        
-        // Carregar dados específicos para cada técnico
-        for (const techName of visibleTechs) {
-          // Preservar dados existentes se o técnico já tinha uma coluna
-          if (techniqueColumns[techName]) {
-            newTechniqueColumns[techName] = techniqueColumns[techName];
-          } else {
-            newTechniqueColumns[techName] = [];
-          }
-          
-          // Preservar grupos existentes se o técnico já tinha grupos
-          if (technicianGroups[techName]) {
-            newTechnicianGroups[techName] = technicianGroups[techName];
-          } else {
-            // Carregar dados específicos do técnico da API
-            console.log(`🔄 Carregando dados do técnico "${techName}"...`);
-            const technicianData = await loadTechnicianData(techName);
+      // Debounce para evitar múltiplas execuções
+      const timeoutId = setTimeout(() => {
+        const initializeTechnicians = async () => {
+          try {
+            setIsLoadingTechnicianColumns(true);
             
-            // Inicializar grupos com dados da API específicos do técnico
-            newTechnicianGroups[techName] = technicianData;
-          }
-        }
+            const newTechniqueColumns = {};
+            const newTechnicianGroups = {};
+            
+            // Identificar quais técnicos são novos e precisam carregar dados
+            const newTechnicians = [];
+            const existingTechnicians = [];
+            
+            for (const techName of visibleTechs) {
+              // Preservar dados existentes se o técnico já tinha uma coluna
+              if (techniqueColumns[techName]) {
+                newTechniqueColumns[techName] = techniqueColumns[techName];
+              } else {
+                newTechniqueColumns[techName] = [];
+              }
+              
+              // Separar técnicos novos dos existentes
+              if (technicianGroups[techName]) {
+                newTechnicianGroups[techName] = technicianGroups[techName];
+                existingTechnicians.push(techName);
+              } else {
+                newTechnicians.push(techName);
+              }
+            }
+            
+            // Usar dados pré-carregados (instantâneo)
+            if (newTechnicians.length > 0) {
+              console.log(`⚡ Usando dados pré-carregados para ${newTechnicians.length} técnicos:`, newTechnicians);
+              console.log('🔍 DEBUG: Estado atual do cache:', technicianDataCache);
+              console.log('🔍 DEBUG: Chaves do cache:', Object.keys(technicianDataCache));
+              
+              newTechnicians.forEach(techName => {
+                // Verificar se existe no cache
+                if (technicianDataCache[techName]) {
+                  console.log(`⚡ Aplicando dados em cache para técnico "${techName}":`, technicianDataCache[techName]);
+                  newTechnicianGroups[techName] = technicianDataCache[techName];
+                } else {
+                  console.log(`⚠️ Técnico "${techName}" não encontrado no cache, usando dados vazios`);
+                  console.log('🔍 DEBUG: Técnicos disponíveis no cache:', Object.keys(technicianDataCache));
+                  newTechnicianGroups[techName] = {
+                    'Em serviço': [],
+                    'Previsto para hoje': [],
+                    'Previstas para amanhã': [],
+                    'Futura': []
+                  };
+                }
+              });
+              
+              console.log(`✅ Dados aplicados instantaneamente para ${newTechnicians.length} técnicos`);
+              console.log('🔍 DEBUG: newTechnicianGroups após aplicação:', newTechnicianGroups);
+            }
 
-        // Atualizar estados
-        setTechniqueColumns(newTechniqueColumns);
-        setTechnicianGroups(newTechnicianGroups);
-        setColumnOrder(visibleTechs);
+            // Atualizar estados
+            setTechniqueColumns(newTechniqueColumns);
+            console.log('🔍 DEBUG: Atualizando setTechnicianGroups com:', newTechnicianGroups);
+            setTechnicianGroups(newTechnicianGroups);
+            setColumnOrder(visibleTechs);
+            
+            console.log('✅ Colunas de técnicos atualizadas:', visibleTechs);
+          } finally {
+            setIsLoadingTechnicianColumns(false);
+          }
+        };
         
-        console.log('✅ Colunas de técnicos atualizadas:', visibleTechs);
-      };
+        initializeTechnicians();
+      }, 100); // Debounce de 100ms
       
-      initializeTechnicians();
+      return () => clearTimeout(timeoutId);
     } else {
       console.log('📋 Lista de técnicos não mudou, mantendo colunas atuais');
     }
-  }, [getVisibleTechniques, techniqueColumns, technicianGroups, columnOrder, getTechnicianIdByName]);
+  }, [getVisibleTechniques, columnOrder, technicianDataCache, techniqueColumns, technicianGroups]);
 
   // Carregar configuração salva do banco de dados
   React.useEffect(() => {
@@ -3746,7 +4135,14 @@ function App() {
     const [isDragging, setIsDragging] = React.useState(false);
     const filterButtonRef = React.useRef(null);
 
-    // Filtro já é inicializado no useEffect principal do App
+    // Debug: verificar os dados recebidos
+    React.useEffect(() => {
+      console.log(`🔍 DEBUG TechnicianColumn "${technician}":`, {
+        orders,
+        technicianGroups: technicianGroups[technician],
+        cache: technicianDataCache[technician]
+      });
+    }, [technician, orders, technicianGroups, technicianDataCache]);
 
     // Calcular posição do filtro quando aberto
     React.useEffect(() => {
@@ -4435,143 +4831,6 @@ function App() {
     return allTypes
       .map(tipo => ({ tipo, count: tipoData[tipo] }))
       .filter(item => item.count > 0); // Mostrar apenas tipos que têm ordens
-  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.sla, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
-
-  const slasWithCounts = React.useMemo(() => {
-    const filtered = getFilteredOrders;
-    const slaData = {
-      'vencido': 0,
-      'vencendo': 0, 
-      'ok': 0
-    };
-    
-    if (dataSource === 'sql_server' && filtered.length > 0) {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
-            if (selectedColumnFilters.tipoOS.length > 0) {
-              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
-            if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            // Calcular SLA baseado em CALC_RESTANTE
-            const calcRestante = ordem.CALC_RESTANTE || 0;
-            const sla = getSLAFromCalcRestante(calcRestante);
-            if (slaData.hasOwnProperty(sla)) {
-              slaData[sla] += 1;
-            }
-          });
-        }
-      });
-    } else {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
-            if (selectedColumnFilters.tipoOS.length > 0) {
-              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
-            if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            // Calcular SLA baseado em CALC_RESTANTE
-            const calcRestante = ordem.CALC_RESTANTE || 0;
-            const sla = getSLAFromCalcRestante(calcRestante);
-            if (slaData.hasOwnProperty(sla)) {
-              slaData[sla] += 1;
-            }
-          });
-        }
-      });
-    }
-    
-    return [
-      { sla: 'vencido', count: slaData.vencido },
-      { sla: 'vencendo', count: slaData.vencendo },
-      { sla: 'ok', count: slaData.ok }
-    ].filter(item => item.count > 0); // Mostrar apenas SLAs que têm ordens
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
   const equipamentosWithCounts = React.useMemo(() => {
@@ -6966,7 +7225,7 @@ function App() {
               </div>
 
               {/* Mostrar colunas de técnicos apenas quando há filtros de equipe ativos */}
-              {hasActiveTeamFilters() && columnOrder.map((technician, index) => (
+              {hasActiveTeamFilters && columnOrder.map((technician, index) => (
                 <TechnicianColumn
                   key={technician}
                   technician={technician}
@@ -6976,7 +7235,7 @@ function App() {
               ))}
 
               {/* Indicador quando não há filtros de equipe ativos */}
-              {!hasActiveTeamFilters() && (
+              {!hasActiveTeamFilters && (
                 <div className="technician-columns-placeholder">
                   <div className="placeholder-content">
                     <i className="bi bi-people"></i>
