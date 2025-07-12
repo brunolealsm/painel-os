@@ -16,7 +16,7 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
 
 // Configuração da API
-const API_BASE_URL = 'http://localhost:3001';
+const API_BASE_URL = 'http://localhost:3002';
 
 // Mock data removido - agora usando dados reais da base de dados
 
@@ -373,12 +373,12 @@ const ProcessConfig = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="status_forward">Encaminhado ao técnico</label>
+            <label htmlFor="status_inservice">Encaminhado ao técnico</label>
             <input
               type="text"
-              id="status_forward"
-              value={processConfig.status_forward}
-              onChange={(e) => handleInputChange('status_forward', e.target.value)}
+              id="status_inservice"
+              value={processConfig.status_inservice}
+              onChange={(e) => handleInputChange('status_inservice', e.target.value)}
               placeholder="Ex: ET"
               className="form-input process-input"
               maxLength="2"
@@ -581,6 +581,111 @@ const InitialLoadingModal = ({ isOpen, steps, hasError, errorMessage, onContinue
     </div>
   );
 };
+
+// Modal de status das ordens
+const OrderStatusModal = ({ isOpen, results, summary, onClose }) => {
+  if (!isOpen) return null;
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success':
+        return <i className="bi bi-check-circle-fill status-icon success"></i>;
+      case 'error':
+        return <i className="bi bi-x-circle-fill status-icon error"></i>;
+      default:
+        return <i className="bi bi-dash-circle status-icon pending"></i>;
+    }
+  };
+
+  const getStatusClass = (status) => {
+    switch (status) {
+      case 'success':
+        return 'order-status-success';
+      case 'error':
+        return 'order-status-error';
+      default:
+        return 'order-status-pending';
+    }
+  };
+
+  const successCount = results.filter(r => r.status === 'success').length;
+  const errorCount = results.filter(r => r.status === 'error').length;
+
+  return (
+    <div className="modal-overlay">
+      <div className="order-status-modal">
+        <div className="order-status-header">
+          <div className="order-status-title">
+            <i className="bi bi-arrows-move"></i>
+            <h3>Status da Movimentação</h3>
+          </div>
+          <button className="btn-close-status" onClick={onClose}>
+            <i className="bi bi-x"></i>
+          </button>
+        </div>
+
+        <div className="order-status-summary">
+          <div className="summary-stats">
+            <div className="stat-item success">
+              <i className="bi bi-check-circle"></i>
+              <span className="stat-number">{successCount}</span>
+              <span className="stat-label">Sucesso</span>
+            </div>
+            {errorCount > 0 && (
+              <div className="stat-item error">
+                <i className="bi bi-x-circle"></i>
+                <span className="stat-number">{errorCount}</span>
+                <span className="stat-label">Erro</span>
+              </div>
+            )}
+          </div>
+          {summary && (
+            <div className="summary-info">
+              <strong>Sessão:</strong> {summary.targetSection}<br/>
+              <strong>Técnico:</strong> {summary.technicianName}
+            </div>
+          )}
+        </div>
+
+        <div className="order-status-content">
+          <div className="order-status-list">
+            {results.map((result, index) => (
+              <div key={index} className={`order-status-item ${getStatusClass(result.status)}`}>
+                <div className="order-status-info">
+                  <div className="order-status-icon">
+                    {getStatusIcon(result.status)}
+                  </div>
+                  <div className="order-status-details">
+                    <div className="order-id">#{result.orderId}</div>
+                    {result.cliente && <div className="order-cliente">{result.cliente}</div>}
+                    {result.status === 'success' && (
+                      <div className="order-status-text success">
+                        Movida para "{result.targetSection}"
+                      </div>
+                    )}
+                    {result.status === 'error' && (
+                      <div className="order-status-text error">
+                        {result.errorMessage || 'Erro desconhecido'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="order-status-footer">
+          <button className="btn-close-status-primary" onClick={onClose}>
+            <i className="bi bi-check2"></i>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Componente de gerenciamento de usuários
 const UserManagement = ({
   users,
@@ -1025,6 +1130,11 @@ function App() {
   const [draggedItem, setDraggedItem] = useState(null);
   const [draggedType, setDraggedType] = useState(null);
   
+  // Estados para modal de status das ordens
+  const [showOrderStatusModal, setShowOrderStatusModal] = useState(false);
+  const [orderStatusResults, setOrderStatusResults] = useState([]);
+  const [orderStatusSummary, setOrderStatusSummary] = useState(null);
+  
   // Novos states para as melhorias
   const [technicianSearchTerm, setTechnicianSearchTerm] = useState('');
   const [areaOptionsMenus, setAreaOptionsMenus] = useState({});
@@ -1404,10 +1514,18 @@ function App() {
     setIsLoadingData(true);
     try {
       console.log('🔄 [1/3] Fazendo requisição para /api/orders/open...');
+      console.log('🔄 URL completa:', `${API_BASE_URL}/api/orders/open?t=${Date.now()}`);
+      
       const response = await fetch(`${API_BASE_URL}/api/orders/open?t=${Date.now()}`);
       
       const fetchTime = performance.now();
       console.log(`⏱️ [1/3] Requisição completada em: ${(fetchTime - startTime).toFixed(2)}ms`);
+      console.log('🔄 Status da resposta:', response.status);
+      console.log('🔄 Headers da resposta:', response.headers);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
       
       console.log('🔄 [2/3] Processando resposta JSON...');
       const result = await response.json();
@@ -1415,28 +1533,49 @@ function App() {
       const parseTime = performance.now();
       console.log(`⏱️ [2/3] JSON parseado em: ${(parseTime - fetchTime).toFixed(2)}ms`);
       
+      console.log('🔄 Resultado completo da API:', {
+        success: result.success,
+        dataSource: result.dataSource,
+        total: result.total,
+        message: result.message,
+        databaseConfigured: result.databaseConfigured,
+        dataLength: result.data ? result.data.length : 0
+      });
+      
       if (result.success) {
         console.log('🔄 [3/3] Aplicando dados ao estado...');
         console.log(`✅ ${result.total} ordens carregadas da API (${result.dataSource})`);
-        console.log('🔍 Dados recebidos da API:', result.data);
+        console.log('🔍 Primeiros dados da API:', result.data.slice(0, 2));
         setApiData(result.data);
         setDataSource(result.dataSource);
         
         // Atualizar estado com dados da API
         setAvailableOrdersState(result.data);
-        console.log('🔍 availableOrdersState atualizado com:', result.data);
+        console.log('🔍 availableOrdersState atualizado com:', result.data.length, 'cidades');
         
         const endTime = performance.now();
         console.log(`⏱️ [3/3] Estado atualizado em: ${(endTime - parseTime).toFixed(2)}ms`);
         console.log(`🎯 PERFORMANCE TOTAL - Ordens carregadas em: ${(endTime - startTime).toFixed(2)}ms (${((endTime - startTime) / 1000).toFixed(2)}s)`);
+        
+        // Log detalhado do dataSource
+        if (result.dataSource === 'sql_server') {
+          console.log('✅ FONTE DE DADOS: SQL Server (dados reais)');
+        } else if (result.dataSource === 'mock_fallback') {
+          console.log('⚠️ FONTE DE DADOS: Mock (fallback do SQL Server)');
+        } else {
+          console.log('🟡 FONTE DE DADOS: Mock (banco não configurado)');
+        }
       } else {
         console.error('❌ Erro ao carregar dados da API:', result.message);
+        console.error('❌ Resultado completo:', result);
         // Manter dados mock em caso de erro
         setAvailableOrdersState(availableOrders);
         setDataSource('mock');
       }
     } catch (error) {
       console.error('❌ Erro na requisição da API:', error);
+      console.error('❌ Tipo do erro:', error.constructor.name);
+      console.error('❌ Stack trace:', error.stack);
       // Manter dados mock em caso de erro
       setAvailableOrdersState(availableOrders);
       setDataSource('mock');
@@ -1755,27 +1894,53 @@ function App() {
         // Etapa 2: Carregar ordens do banco (detectar erro de conexão)
         updateLoadingStep('orders', 'loading');
         let connectionFailed = false;
+        let sqlServerFailed = false;
         
         try {
           // Tentar conectar ao backend
+          console.log('🔄 Tentando conectar ao backend:', `${API_BASE_URL}/api/orders/open`);
           const response = await fetch(`${API_BASE_URL}/api/orders/open?t=${Date.now()}`, {
-            timeout: 5000 // 5 segundos de timeout
+            timeout: 10000 // 10 segundos de timeout
           });
+          
+          console.log('🔄 Resposta do backend recebida:', response.status);
           
           if (!response.ok) {
             throw new Error(`Servidor retornou status ${response.status}`);
           }
           
           const result = await response.json();
+          console.log('🔄 Dados recebidos do backend:', {
+            success: result.success,
+            dataSource: result.dataSource,
+            total: result.total,
+            message: result.message
+          });
           
-          if (result.success && result.dataSource === 'sql_server') {
-            // Conexão SQL Server bem-sucedida
-            await loadOrdersFromAPI();
-            updateLoadingStep('orders', 'completed');
+          if (result.success) {
+            if (result.dataSource === 'sql_server') {
+              // Conexão SQL Server bem-sucedida
+              console.log('✅ Dados carregados do SQL Server com sucesso');
+              await loadOrdersFromAPI();
+              updateLoadingStep('orders', 'completed');
+            } else if (result.dataSource === 'mock_fallback') {
+              // SQL Server falhou, usando mock como fallback
+              console.log('⚠️ SQL Server falhou, usando dados mock');
+              sqlServerFailed = true;
+              await loadOrdersFromAPI();
+              updateLoadingStep('orders', 'completed');
+              setLoadingHasError(true);
+              setLoadingErrorMessage(`Erro na conexão com o SQL Server: ${result.message || 'Conexão falhou'}. Sistema iniciado com dados de demonstração.`);
+            } else {
+              // Usando dados mock (banco não configurado)
+              console.log('⚠️ Banco não configurado, usando dados mock');
+              await loadOrdersFromAPI();
+              updateLoadingStep('orders', 'completed');
+              setLoadingHasError(true);
+              setLoadingErrorMessage('Banco de dados não configurado. Sistema iniciado com dados de demonstração. Configure o banco em Configurações > Banco de Dados.');
+            }
           } else {
-            // Fallback para mock data mas sem erro crítico
-            await loadOrdersFromAPI();
-            updateLoadingStep('orders', 'completed');
+            throw new Error(result.message || 'Erro desconhecido na API');
           }
         } catch (error) {
           // Erro de conexão com backend
@@ -1783,7 +1948,7 @@ function App() {
           connectionFailed = true;
           updateLoadingStep('orders', 'error');
           setLoadingHasError(true);
-          setLoadingErrorMessage('Não foi possível conectar ao servidor backend. O sistema será iniciado com dados de demonstração.');
+          setLoadingErrorMessage(`Não foi possível conectar ao servidor backend (${error.message}). Verifique se o servidor está rodando na porta 3002.`);
           
           // Ainda tentar carregar dados mock
           await loadOrdersFromAPI();
@@ -2828,7 +2993,7 @@ function App() {
     }
   }, [availableOrdersState, initialFilterApplied]);
 
-  const handleDropToTechnique = (technicianName, groupName = 'Previsto para hoje') => {
+  const handleDropToTechnique = async (technicianName, groupName = 'Previsto para hoje') => {
     // Não permitir drop no grupo "Em serviço"
     if (groupName === 'Em serviço') {
       return;
@@ -2839,70 +3004,182 @@ function App() {
       return;
     }
     
-    // Encontrar os dados reais das ordens selecionadas
-    const realOrdersData = [];
-    const currentData = availableOrdersState;
+    // Se não há ordens selecionadas, não fazer nada
+    if (selectedOrders.length === 0) {
+      console.log('⚠️ Nenhuma ordem selecionada para arrastar');
+      return;
+    }
     
-    selectedOrders.forEach(orderId => {
-      // Procurar a ordem nos dados disponíveis
-      currentData.forEach(cityGroup => {
-        cityGroup.ordens.forEach(ordem => {
-          if ((ordem.id || ordem.TB02115_CODIGO) === orderId) {
-            // Preservar dados reais originais
-            const realOrder = {
-              id: ordem.id || ordem.TB02115_CODIGO,
-              cliente: ordem.cliente || ordem.TB01008_NOME,
-              equipamento: ordem.equipamento || ordem.TB01010_NOME,
-              tipo: ordem.tipo || getServiceTypeFromPreventiva(ordem.TB02115_PREVENTIVA),
-              sla: ordem.sla || getSLAFromCalcRestante(ordem.CALC_RESTANTE),
-              cidade: cityGroup.cidade,
-              pedidoVinculado: ordem.pedidoVinculado,
-              // Campos necessários para os modais e sidebars
-              numeroSerie: ordem.numeroSerie,
-              serie: ordem.serie,
-              patrimonio: ordem.patrimonio,
-              endereco: ordem.endereco,
-              dataAbertura: ordem.dataAbertura,
-              tecnico: ordem.tecnico,
-              coordenador: ordem.coordenador,
-              area: ordem.area,
-              bairro: ordem.bairro,
-              estado: ordem.estado,
-              contrato: ordem.contrato,
-              // Preservar todos os campos originais para referência
-              TB02115_CODIGO: ordem.TB02115_CODIGO,
-              TB01008_NOME: ordem.TB01008_NOME,
-              TB01010_NOME: ordem.TB01010_NOME,
-              TB02115_PREVENTIVA: ordem.TB02115_PREVENTIVA,
-              TB02115_BAIRRO: ordem.TB02115_BAIRRO,
-              CALC_RESTANTE: ordem.CALC_RESTANTE,
-              TB01047_NOME: ordem.TB01047_NOME,
-              TB01018_NOME: ordem.TB01018_NOME,
-              TB01073_NOME: ordem.TB01073_NOME
-            };
-            realOrdersData.push(realOrder);
-          }
+    try {
+      console.log(`🎯 Atualizando ${selectedOrders.length} ordens para seção "${groupName}" do técnico "${technicianName}"`);
+      
+      // Obter ID do técnico
+      const technicianId = getTechnicianIdByName(technicianName);
+      console.log(`🔍 ID do técnico "${technicianName}": ${technicianId}`);
+      
+      // Objeto que será enviado para o backend
+      const requestPayload = {
+        orderIds: selectedOrders,
+        targetSection: groupName,
+        technicianId: technicianId
+      };
+      
+      // Fazer chamada da API para atualizar status no banco de dados
+      const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      const result = await response.json();
+      
+      // Preparar dados para o modal
+      const orderResults = [];
+      
+      // Buscar dados das ordens selecionadas para o modal
+      const currentData = availableOrdersState;
+      const realOrdersData = [];
+      
+      if (!result.success) {
+        console.error('❌ Erro ao atualizar status no banco:', result.message);
+        
+        // Criar resultados de erro para o modal
+        selectedOrders.forEach(orderId => {
+          let orderData = { orderId, status: 'error', errorMessage: result.message };
+          
+          // Buscar dados da ordem para o modal
+          currentData.forEach(cityGroup => {
+            cityGroup.ordens.forEach(ordem => {
+              if ((ordem.id || ordem.TB02115_CODIGO) === orderId) {
+                orderData.cliente = ordem.cliente || ordem.TB01008_NOME;
+              }
+            });
+          });
+          
+          orderResults.push(orderData);
+        });
+        
+        // Mostrar modal com erro
+        setOrderStatusResults(orderResults);
+        setOrderStatusSummary({
+          targetSection: groupName,
+          technicianName: technicianName
+        });
+        setShowOrderStatusModal(true);
+        return;
+      }
+      
+      console.log(`✅ Status atualizado no banco: ${result.message}`);
+      console.log('📊 Detalhes:', result.data);
+      
+      // Só proceder com a atualização local se o banco foi atualizado com sucesso
+      
+      selectedOrders.forEach(orderId => {
+        // Procurar a ordem nos dados disponíveis
+        availableOrdersState.forEach(cityGroup => {
+          cityGroup.ordens.forEach(ordem => {
+            if ((ordem.id || ordem.TB02115_CODIGO) === orderId) {
+              // Preservar dados reais originais
+              const realOrder = {
+                id: ordem.id || ordem.TB02115_CODIGO,
+                cliente: ordem.cliente || ordem.TB01008_NOME,
+                equipamento: ordem.equipamento || ordem.TB01010_NOME,
+                tipo: ordem.tipo || getServiceTypeFromPreventiva(ordem.TB02115_PREVENTIVA),
+                sla: ordem.sla || getSLAFromCalcRestante(ordem.CALC_RESTANTE),
+                cidade: cityGroup.cidade,
+                pedidoVinculado: ordem.pedidoVinculado,
+                // Campos necessários para os modais e sidebars
+                numeroSerie: ordem.numeroSerie,
+                serie: ordem.serie,
+                patrimonio: ordem.patrimonio,
+                endereco: ordem.endereco,
+                dataAbertura: ordem.dataAbertura,
+                tecnico: ordem.tecnico,
+                coordenador: ordem.coordenador,
+                area: ordem.area,
+                bairro: ordem.bairro,
+                estado: ordem.estado,
+                contrato: ordem.contrato,
+                // Preservar todos os campos originais para referência
+                TB02115_CODIGO: ordem.TB02115_CODIGO,
+                TB01008_NOME: ordem.TB01008_NOME,
+                TB01010_NOME: ordem.TB01010_NOME,
+                TB02115_PREVENTIVA: ordem.TB02115_PREVENTIVA,
+                TB02115_BAIRRO: ordem.TB02115_BAIRRO,
+                CALC_RESTANTE: ordem.CALC_RESTANTE,
+                TB01047_NOME: ordem.TB01047_NOME,
+                TB01018_NOME: ordem.TB01018_NOME,
+                TB01073_NOME: ordem.TB01073_NOME
+              };
+              realOrdersData.push(realOrder);
+              
+              // Adicionar resultado de sucesso para o modal
+              orderResults.push({
+                orderId: realOrder.id,
+                cliente: realOrder.cliente,
+                status: 'success',
+                targetSection: groupName
+              });
+            }
+          });
         });
       });
-    });
-    
-    // Adicionar ordens reais ao grupo do técnico
-    newTechnicianGroups[technicianName][groupName] = [
-      ...newTechnicianGroups[technicianName][groupName],
-      ...realOrdersData
-    ];
-    
-    // Remover ordens de availableOrdersState
-    const newAvailableOrders = availableOrdersState.map(item => ({
-      ...item,
-      ordens: item.ordens.filter(ordem => 
-        !selectedOrders.includes(ordem.id || ordem.TB02115_CODIGO)
-      )
-    })).filter(item => item.ordens.length > 0);
-    
-    setAvailableOrdersState(newAvailableOrders);
-    setTechnicianGroups(newTechnicianGroups);
-    setSelectedOrders([]);
+      
+      // Adicionar ordens reais ao grupo do técnico
+      newTechnicianGroups[technicianName][groupName] = [
+        ...newTechnicianGroups[technicianName][groupName],
+        ...realOrdersData
+      ];
+      
+      // Remover ordens de availableOrdersState
+      const newAvailableOrders = availableOrdersState.map(item => ({
+        ...item,
+        ordens: item.ordens.filter(ordem => 
+          !selectedOrders.includes(ordem.id || ordem.TB02115_CODIGO)
+        )
+      })).filter(item => item.ordens.length > 0);
+      
+      setAvailableOrdersState(newAvailableOrders);
+      setTechnicianGroups(newTechnicianGroups);
+      setSelectedOrders([]);
+      
+      // Mostrar modal com resultados de sucesso
+      setOrderStatusResults(orderResults);
+      setOrderStatusSummary({
+        targetSection: groupName,
+        technicianName: technicianName
+      });
+      setShowOrderStatusModal(true);
+      
+    } catch (error) {
+      console.error('❌ Erro na chamada da API de atualização:', error);
+      
+      // Criar resultados de erro para o modal
+      const errorResults = selectedOrders.map(orderId => {
+        let orderData = { orderId, status: 'error', errorMessage: `Erro de conexão: ${error.message}` };
+        
+        // Buscar dados da ordem para o modal
+        availableOrdersState.forEach(cityGroup => {
+          cityGroup.ordens.forEach(ordem => {
+            if ((ordem.id || ordem.TB02115_CODIGO) === orderId) {
+              orderData.cliente = ordem.cliente || ordem.TB01008_NOME;
+            }
+          });
+        });
+        
+        return orderData;
+      });
+      
+      // Mostrar modal com erro
+      setOrderStatusResults(errorResults);
+      setOrderStatusSummary({
+        targetSection: groupName,
+        technicianName: technicianName
+      });
+      setShowOrderStatusModal(true);
+    }
   };
 
   // Nova função para retornar ordens para "Em aberto"
@@ -6511,8 +6788,8 @@ function App() {
       try {
         // Buscar último atendimento e histórico em paralelo
         const [lastServiceResponse, historyResponse] = await Promise.all([
-          fetch(`http://localhost:3001/api/equipment/last-service/${order.numeroSerie}`),
-          fetch(`http://localhost:3001/api/equipment/history/${order.numeroSerie}`)
+                  fetch(`http://localhost:3002/api/equipment/last-service/${order.numeroSerie}`),
+        fetch(`http://localhost:3002/api/equipment/history/${order.numeroSerie}`)
         ]);
 
         if (!lastServiceResponse.ok || !historyResponse.ok) {
@@ -7797,6 +8074,14 @@ function App() {
       />
 
       </div>
+
+      {/* Modal de status das ordens */}
+      <OrderStatusModal 
+        isOpen={showOrderStatusModal}
+        results={orderStatusResults}
+        summary={orderStatusSummary}
+        onClose={() => setShowOrderStatusModal(false)}
+      />
 
       {/* Modal de carregamento inicial */}
       <InitialLoadingModal 
