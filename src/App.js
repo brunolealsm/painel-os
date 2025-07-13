@@ -1067,6 +1067,16 @@ function App() {
   const [showTechnicianFilter, setShowTechnicianFilter] = useState({});
   const [technicianFilterPositions, setTechnicianFilterPositions] = useState({});
   
+  // Estados para menu das colunas de técnicos
+  const [showTechnicianMenu, setShowTechnicianMenu] = useState({});
+  const [technicianMenuPositions, setTechnicianMenuPositions] = useState({});
+  
+  // Estados para o modal de rota
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [routeModalData, setRouteModalData] = useState(null);
+  const [routeModalLoading, setRouteModalLoading] = useState(false);
+  const [routeModalError, setRouteModalError] = useState(null);
+  
   // Ref e estado para preservar posição do scroll da coluna Em Aberto
   const openColumnScrollRef = useRef(null);
   const lastScrollPosition = useRef(0);
@@ -1242,6 +1252,14 @@ function App() {
           !event.target.closest('.technician-filter-container')) {
         setShowTechnicianFilter({});
       }
+      
+      // Fechar menus das colunas de técnicos
+      const hasOpenTechnicianMenu = Object.values(showTechnicianMenu).some(Boolean);
+      if (hasOpenTechnicianMenu && 
+          !event.target.closest('.technician-menu-modal') && 
+          !event.target.closest('.technician-menu-container')) {
+        setShowTechnicianMenu({});
+      }
 
       // Fechar dropdown de cidade
       if (openCityDropdown && 
@@ -1294,13 +1312,22 @@ function App() {
           event.target.classList.contains('modal-overlay')) {
         setShowManagementDiagram(false);
       }
+
+      // Fechar modal de rota
+      if (showRouteModal && 
+          !event.target.closest('.route-modal-content') && 
+          event.target.classList.contains('modal-overlay')) {
+        setShowRouteModal(false);
+        setRouteModalData(null);
+        setRouteModalError(null);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, openCityDropdown, showOrderSidebar, showEquipmentSidebar, areaOptionsMenus, areaActionMenus, showManagementDiagram]);
+  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, showTechnicianMenu, openCityDropdown, showOrderSidebar, showEquipmentSidebar, areaOptionsMenus, areaActionMenus, showManagementDiagram, showRouteModal]);
   const [activeConfigSection, setActiveConfigSection] = useState('database');
   
   // Estado para controlar ordens disponíveis (removidas quando movidas)
@@ -3301,6 +3328,155 @@ function App() {
     setColumnOrder(newOrder);
   };
 
+  // Função para geocodificar endereços usando API gratuita e confiável
+  const geocodeAddress = async (address) => {
+    try {
+      // Usar API gratuita que permite CORS e é confiável
+      const url = `https://geocode.xyz/${encodeURIComponent(address)}?json=1&limit=1`;
+      
+      console.log(`🌍 Fazendo geocodificação para: ${address}`);
+      console.log(`🔗 URL: ${url}`);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log(`📍 Resultado geocodificação:`, data);
+      
+      if (data && data.latt && data.longt) {
+        return {
+          lat: parseFloat(data.latt),
+          lng: parseFloat(data.longt),
+          display_name: data.standard?.city || data.standard?.countryname || address
+        };
+      }
+      return null;
+    } catch (error) {
+      console.error('Erro ao geocodificar endereço:', error);
+      // Se falhar, tentar com uma API alternativa mais simples
+      try {
+        console.log('🔄 Tentando API alternativa...');
+        const alternativeUrl = `https://api.bigdatacloud.net/data/geocoding/latest?q=${encodeURIComponent(address)}&limit=1`;
+        const altResponse = await fetch(alternativeUrl);
+        
+        if (altResponse.ok) {
+          const altData = await altResponse.json();
+          if (altData && altData.length > 0) {
+            const result = altData[0];
+            return {
+              lat: parseFloat(result.latitude),
+              lng: parseFloat(result.longitude),
+              display_name: result.locality || address
+            };
+          }
+        }
+      } catch (altError) {
+        console.error('Erro na API alternativa:', altError);
+      }
+      return null;
+    }
+  };
+
+  // Função para visualizar rota do técnico (versão simplificada - sem geocodificação)
+  const handleViewTechnicianRoute = async (technicianName) => {
+    try {
+      setRouteModalLoading(true);
+      setRouteModalError(null);
+      setShowRouteModal(true); // Mostrar modal com loading
+      
+      // Buscar ordens do técnico para amanhã
+      const tomorrowOrders = technicianGroups[technicianName]?.['Previstas para amanhã'] || [];
+      
+      if (tomorrowOrders.length === 0) {
+        setRouteModalError(`Nenhuma ordem de serviço encontrada para amanhã para o técnico ${technicianName}`);
+        setRouteModalLoading(false);
+        setRouteModalData({
+          technicianName,
+          orders: []
+        });
+        return;
+      }
+
+      console.log(`🗺️ Buscando rota para ${technicianName} - ${tomorrowOrders.length} ordens`);
+      
+      // Filtrar ordens que têm cidade válida (excluir "Sem cidade")
+      const validOrders = tomorrowOrders.filter(order => {
+        const cidade = order.cidade || order.TB02115_CIDADE;
+        return cidade && cidade.trim() !== '' && cidade !== 'Sem cidade';
+      });
+
+      if (validOrders.length === 0) {
+        setRouteModalError(`Nenhuma ordem com cidade válida encontrada para o técnico ${technicianName}. Todas as ordens estão sem cidade definida.`);
+        setRouteModalLoading(false);
+        setRouteModalData({
+          technicianName,
+          orders: []
+        });
+        return;
+      }
+
+      console.log(`📍 ${validOrders.length} ordens com cidade válida encontradas`);
+      
+      // Buscar ordens roteirizadas do banco de dados
+      const technicianId = validOrders[0]?.TB02115_CODTEC; // Usar o código do técnico da primeira ordem
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const forecastDate = tomorrow.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      
+      let routedOrders = [];
+      if (technicianId) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/route/technician-orders/${technicianId}?forecast=${forecastDate}`);
+          const result = await response.json();
+          
+          if (result.success) {
+            routedOrders = result.data.orders;
+            console.log(`🗂️ ${routedOrders.length} ordens roteirizadas carregadas do banco`);
+          } else {
+            console.warn('⚠️ Erro ao carregar ordens roteirizadas:', result.message);
+          }
+        } catch (error) {
+          console.warn('⚠️ Erro ao conectar com API de roteirização:', error);
+        }
+      }
+      
+      // Preparar ordens com endereço
+      const ordersWithAddress = validOrders.map(order => {
+        const cidade = order.cidade || order.TB02115_CIDADE;
+        const endereco = order.endereco || order.TB02115_ENDERECO;
+        const enderecoCompleto = endereco ? `${endereco}, ${cidade}` : cidade;
+        
+        // Verificar se a ordem está roteirizada
+        const routedOrder = routedOrders.find(ro => ro.os === (order.id || order.TB02115_CODIGO));
+        
+        return {
+          ...order,
+          endereco: enderecoCompleto,
+          isRouted: !!routedOrder,
+          routeSequence: routedOrder?.sequence || null
+        };
+      });
+
+      console.log(`✅ ${ordersWithAddress.length} ordens preparadas para exibição`);
+      
+      setRouteModalData({
+        technicianName,
+        orders: ordersWithAddress,
+        technicianId,
+        forecastDate
+      });
+      setRouteModalLoading(false);
+      
+    } catch (error) {
+      console.error('Erro ao buscar rota:', error);
+      setRouteModalError('Erro ao buscar rota: ' + error.message);
+      setRouteModalLoading(false);
+    }
+  };
+
   // Função para selecionar/desselecionar todas as ordens de uma cidade
   const selectAllOrdersFromCity = (cityOrders) => {
     const cityOrderIds = cityOrders.map(ordem => ordem.id);
@@ -4411,6 +4587,7 @@ function App() {
   const TechnicianColumn = ({ technician, orders, index }) => {
     const [isDragging, setIsDragging] = React.useState(false);
     const filterButtonRef = React.useRef(null);
+    const menuButtonRef = React.useRef(null);
 
     // Debug: verificar os dados recebidos
     React.useEffect(() => {
@@ -4452,6 +4629,38 @@ function App() {
         return () => clearTimeout(timeoutId);
       }
     }, [showTechnicianFilter[technician], technician]);
+
+    // Calcular posição do menu quando aberto
+    React.useEffect(() => {
+      if (showTechnicianMenu[technician] && menuButtonRef.current) {
+        // Usar setTimeout para evitar problemas de layout
+        const timeoutId = setTimeout(() => {
+          if (menuButtonRef.current) {
+            const rect = menuButtonRef.current.getBoundingClientRect();
+            const newPosition = {
+              top: rect.bottom + 4,
+              left: rect.right - 220 // 220px é a largura do dropdown do menu
+            };
+            
+            // Só atualizar se a posição realmente mudou
+            setTechnicianMenuPositions(prev => {
+              const currentPosition = prev[technician];
+              if (!currentPosition || 
+                  Math.abs(currentPosition.top - newPosition.top) > 1 || 
+                  Math.abs(currentPosition.left - newPosition.left) > 1) {
+                return {
+                  ...prev,
+                  [technician]: newPosition
+                };
+              }
+              return prev;
+            });
+          }
+        }, 0);
+        
+        return () => clearTimeout(timeoutId);
+      }
+    }, [showTechnicianMenu[technician], technician]);
 
     const filteredGroups = React.useMemo(() => 
       getFilteredTechnicianGroups(technician), 
@@ -4498,22 +4707,37 @@ function App() {
               {Object.values(filteredGroups).reduce((total, group) => total + group.length, 0)}
             </span>
           </div>
-          <div className="technician-filter-container">
-            <div 
-              ref={filterButtonRef}
-              className={`technician-filter-icon ${hasActiveFilters ? 'active' : ''}`}
-              onClick={() => setShowTechnicianFilter(prev => ({
-                ...prev,
-                [technician]: !prev[technician]
-              }))}
-            >
-              <i className="bi bi-funnel"></i>
-            </div>
-            {hasActiveFilters && (
-              <div className="technician-filter-badge">
-                {activeFiltersCount}
+          <div className="technician-header-actions">
+            <div className="technician-menu-container">
+              <div 
+                ref={menuButtonRef}
+                className="technician-menu-icon"
+                onClick={() => setShowTechnicianMenu(prev => ({
+                  ...prev,
+                  [technician]: !prev[technician]
+                }))}
+                title="Menu do técnico"
+              >
+                <i className="bi bi-three-dots"></i>
               </div>
-            )}
+            </div>
+            <div className="technician-filter-container">
+              <div 
+                ref={filterButtonRef}
+                className={`technician-filter-icon ${hasActiveFilters ? 'active' : ''}`}
+                onClick={() => setShowTechnicianFilter(prev => ({
+                  ...prev,
+                  [technician]: !prev[technician]
+                }))}
+              >
+                <i className="bi bi-funnel"></i>
+              </div>
+              {hasActiveFilters && (
+                <div className="technician-filter-badge">
+                  {activeFiltersCount}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -4582,6 +4806,722 @@ function App() {
           );
         })}
       </>
+    );
+  };
+
+  // Componente para renderizar todos os modais de menu de técnicos
+  const TechnicianMenuModals = () => {
+    return (
+      <>
+        {Object.entries(showTechnicianMenu).map(([technician, isOpen]) => {
+          if (!isOpen || !technicianMenuPositions[technician]) return null;
+          
+          const position = technicianMenuPositions[technician];
+          
+          return (
+            <div 
+              key={technician}
+              className="technician-menu-modal"
+              style={{
+                position: 'fixed',
+                top: `${position.top}px`,
+                left: `${position.left}px`,
+                zIndex: 99999
+              }}
+            >
+              <div className="technician-menu-dropdown">
+                <div className="technician-menu-item">
+                  <div className="technician-menu-info">
+                    <div className="technician-menu-label">
+                      <i className="bi bi-person-gear"></i>
+                      {technician}
+                    </div>
+                    <div className="technician-menu-desc">Opções do técnico</div>
+                  </div>
+                </div>
+                
+                <div className="technician-menu-item">
+                  <div 
+                    className="technician-menu-option"
+                    onClick={() => {
+                      // Função para visualizar rota de hoje
+                      console.log(`Visualizar rota de hoje para ${technician}`);
+                      setShowTechnicianMenu(prev => ({ ...prev, [technician]: false }));
+                      handleViewTechnicianRoute(technician);
+                    }}
+                  >
+                    <i className="bi bi-geo-alt"></i>
+                    <span>Visualizar rota de hoje</span>
+                  </div>
+                </div>
+                
+                <div className="technician-menu-item">
+                  <div 
+                    className="technician-menu-option"
+                    onClick={() => {
+                      // Função para impressão de roteiro
+                      console.log(`Impressão de roteiro para ${technician}`);
+                      alert(`Impressão de roteiro para ${technician} - Função em desenvolvimento`);
+                      setShowTechnicianMenu(prev => ({ ...prev, [technician]: false }));
+                    }}
+                  >
+                    <i className="bi bi-printer"></i>
+                    <span>Impressão de roteiro</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
+  // Componente do modal de rota
+  const RouteModal = ({ isOpen, routeData, loading, error, onClose }) => {
+    const [unroutedOrders, setUnroutedOrders] = React.useState([]);
+    const [routedOrders, setRoutedOrders] = React.useState([]);
+    const [draggedOrder, setDraggedOrder] = React.useState(null);
+    const [tooltipOrder, setTooltipOrder] = React.useState(null);
+    const [showTooltip, setShowTooltip] = React.useState(false);
+    const [tooltipPosition, setTooltipPosition] = React.useState({ x: 0, y: 0 });
+
+    // Funções para mapear tipo de serviço e cores (consistentes com o resto da aplicação)
+    const getServiceTypeFromPreventiva = (preventiva) => {
+      const typeMap = {
+        'E': 'E', // ESTOQUE
+        'B': 'B', // BALCÃO
+        'A': 'A', // AFERIÇÃO
+        'R': 'R', // RETORNO-RECARGA
+        'D': 'D', // DESINSTALAÇÃO
+        'I': 'I', // INSTALAÇÃO
+        'S': 'S', // PREVENTIVA
+        'N': 'C'  // NORMAL/CORRETIVA - mapear para 'C' visualmente
+      };
+      return typeMap[preventiva] || 'C'; // Padrão para corretiva (C visualmente)
+    };
+
+    const getServiceColor = (tipo) => {
+      switch(tipo) {
+        case 'E': return '#9c27b0'; // ESTOQUE - Roxo
+        case 'B': return '#ff5722'; // BALCÃO - Laranja
+        case 'A': return '#607d8b'; // AFERIÇÃO - Azul acinzentado
+        case 'R': return '#795548'; // RETORNO-RECARGA - Marrom
+        case 'D': return '#f44336'; // DESINSTALAÇÃO - Vermelho
+        case 'I': return '#2196f3'; // INSTALAÇÃO - Azul
+        case 'S': return '#4caf50'; // PREVENTIVA - Verde
+        case 'C': return '#ff9800'; // CORRETIVA - Amarelo/Laranja
+        default: return '#9e9e9e';  // Cinza para desconhecido
+      }
+    };
+
+    React.useEffect(() => {
+      if (routeData && routeData.orders) {
+        // Separar ordens roteirizadas e não roteirizadas
+        const unrouted = [];
+        const routed = [];
+        
+        routeData.orders.forEach(order => {
+          if (order.isRouted && order.routeSequence) {
+            routed.push({
+              ...order,
+              routeOrder: order.routeSequence
+            });
+          } else {
+            unrouted.push(order);
+          }
+        });
+        
+        // Ordenar ordens roteirizadas por sequência
+        routed.sort((a, b) => a.routeOrder - b.routeOrder);
+        
+        setUnroutedOrders(unrouted);
+        setRoutedOrders(routed);
+      }
+    }, [routeData]);
+
+    const handleDragStart = (e, order) => {
+      setDraggedOrder(order);
+      e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    };
+
+    const handleDropToRouted = async (e) => {
+      e.preventDefault();
+      if (draggedOrder) {
+        // Verificar se a ordem já existe na lista roteirizada
+        const existingInRouted = routedOrders.find(order => 
+          order.id === draggedOrder.id || order.TB02115_CODIGO === draggedOrder.TB02115_CODIGO
+        );
+        
+        if (existingInRouted) {
+          // Se já existe, não fazer nada (evitar duplicação)
+          setDraggedOrder(null);
+          return;
+        }
+        
+        const newSequence = routedOrders.length + 1;
+        const newRoutedOrder = {
+          ...draggedOrder,
+          routeOrder: newSequence
+        };
+        
+        // Inserir no banco de dados
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/route/add-order`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              technicianId: routeData.technicianId,
+              orderNumber: draggedOrder.id || draggedOrder.TB02115_CODIGO,
+              sequence: newSequence,
+              forecast: routeData.forecastDate
+            })
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            console.log('✅ Ordem inserida na roteirização:', result.message);
+            setRoutedOrders([...routedOrders, newRoutedOrder]);
+            setUnroutedOrders(unroutedOrders.filter(order => 
+              order.id !== draggedOrder.id && order.TB02115_CODIGO !== draggedOrder.TB02115_CODIGO
+            ));
+          } else {
+            console.error('❌ Erro ao inserir ordem na roteirização:', result.message);
+            // Não atualizar o estado se houve erro no banco
+          }
+        } catch (error) {
+          console.error('❌ Erro na requisição de inserção:', error);
+          // Não atualizar o estado se houve erro na requisição
+        }
+        
+        setDraggedOrder(null);
+      }
+    };
+
+    const handleDropToUnrouted = async (e) => {
+      e.preventDefault();
+      if (draggedOrder) {
+        // Verificar se a ordem já existe na lista não roteirizada
+        const existingInUnrouted = unroutedOrders.find(order => 
+          order.id === draggedOrder.id || order.TB02115_CODIGO === draggedOrder.TB02115_CODIGO
+        );
+        
+        if (existingInUnrouted) {
+          // Se já existe, não fazer nada (evitar duplicação)
+          setDraggedOrder(null);
+          return;
+        }
+        
+        // Remover do banco de dados
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/route/remove-order`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              technicianId: routeData.technicianId,
+              orderNumber: draggedOrder.id || draggedOrder.TB02115_CODIGO,
+              forecast: routeData.forecastDate
+            })
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            console.log('✅ Ordem removida da roteirização:', result.message);
+            setUnroutedOrders([...unroutedOrders, draggedOrder]);
+            setRoutedOrders(routedOrders.filter(order => 
+              order.id !== draggedOrder.id && order.TB02115_CODIGO !== draggedOrder.TB02115_CODIGO
+            ));
+          } else {
+            console.error('❌ Erro ao remover ordem da roteirização:', result.message);
+            // Não atualizar o estado se houve erro no banco
+          }
+        } catch (error) {
+          console.error('❌ Erro na requisição de remoção:', error);
+          // Não atualizar o estado se houve erro na requisição
+        }
+        
+        setDraggedOrder(null);
+      }
+    };
+
+    const handleReorderRouted = async (dragIndex, dropIndex) => {
+      const newRoutedOrders = [...routedOrders];
+      const draggedItem = newRoutedOrders[dragIndex];
+      newRoutedOrders.splice(dragIndex, 1);
+      newRoutedOrders.splice(dropIndex, 0, draggedItem);
+      
+      // Reordenar números
+      newRoutedOrders.forEach((order, index) => {
+        order.routeOrder = index + 1;
+      });
+      
+      setRoutedOrders(newRoutedOrders);
+      
+      // Atualizar sequências de todas as ordens afetadas no banco de dados
+      try {
+        // Atualizar todas as ordens que tiveram suas sequências alteradas
+        const updatePromises = newRoutedOrders.map((order, index) => {
+          const newSequence = index + 1;
+          return fetch(`${API_BASE_URL}/api/route/update-sequence`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              technicianId: routeData.technicianId,
+              orderNumber: order.id || order.TB02115_CODIGO,
+              newSequence: newSequence,
+              forecast: routeData.forecastDate
+            })
+          });
+        });
+        
+        const responses = await Promise.all(updatePromises);
+        const results = await Promise.all(responses.map(res => res.json()));
+        
+        const successCount = results.filter(result => result.success).length;
+        const errorCount = results.filter(result => !result.success).length;
+        
+        if (errorCount === 0) {
+          console.log(`✅ Sequências atualizadas no banco: ${successCount} ordens`);
+        } else {
+          console.error(`❌ Erro ao atualizar ${errorCount} sequências no banco`);
+          results.forEach((result, index) => {
+            if (!result.success) {
+              console.error(`  - Ordem ${newRoutedOrders[index].id || newRoutedOrders[index].TB02115_CODIGO}: ${result.message}`);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('❌ Erro na requisição de atualização:', error);
+      }
+    };
+
+    const handleDragOverRouted = (e, dropIndex) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      
+      // Adicionar indicador visual de onde será inserido
+      const target = e.currentTarget;
+      target.classList.add('drag-over');
+    };
+
+    const handleDragLeave = (e) => {
+      e.currentTarget.classList.remove('drag-over');
+    };
+
+    const handleDropInRouted = (e, dropIndex) => {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      
+      if (draggedOrder) {
+        // Se a ordem já está na lista roteirizada, reordenar
+        const existingIndex = routedOrders.findIndex(order => 
+          order.id === draggedOrder.id || order.TB02115_CODIGO === draggedOrder.TB02115_CODIGO
+        );
+        
+        if (existingIndex !== -1) {
+          handleReorderRouted(existingIndex, dropIndex);
+        } else {
+          // Se é uma nova ordem, adicionar na posição
+          const newRoutedOrder = {
+            ...draggedOrder,
+            routeOrder: dropIndex + 1
+          };
+          
+          const newRoutedOrders = [...routedOrders];
+          newRoutedOrders.splice(dropIndex, 0, newRoutedOrder);
+          
+          // Reordenar números
+          newRoutedOrders.forEach((order, index) => {
+            order.routeOrder = index + 1;
+          });
+          
+          setRoutedOrders(newRoutedOrders);
+          setUnroutedOrders(unroutedOrders.filter(order => 
+            order.id !== draggedOrder.id && order.TB02115_CODIGO !== draggedOrder.TB02115_CODIGO
+          ));
+        }
+        setDraggedOrder(null);
+      }
+    };
+
+    const handleOrderClick = (order, event) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      
+      // Debug: Log dos campos disponíveis na ordem
+      console.log('🔍 Debug - Campos da ordem no tooltip:', {
+        id: order.id || order.TB02115_CODIGO,
+        numeroSerie: order.numeroSerie,
+        motivoOS: order.motivoOS,
+        serie: order.serie || order.TB02115_NUMSERIE,
+        motivo: order.motivo || order.TB02115_NOME,
+        TB02115_NUMSERIE: order.TB02115_NUMSERIE,
+        TB02115_NOME: order.TB02115_NOME,
+        allFields: Object.keys(order).filter(key => key.includes('SERIE') || key.includes('NOME') || key.includes('MOTIVO'))
+      });
+      
+      setTooltipPosition({
+        x: rect.right + 10,
+        y: rect.top
+      });
+      setTooltipOrder(order);
+      setShowTooltip(true);
+    };
+
+    const closeTooltip = () => {
+      setShowTooltip(false);
+      setTooltipOrder(null);
+    };
+
+    const hasLinkedOrder = (order) => {
+      return order.pedidoVinculado || order.TB02115_PEDIDO_VINCULADO;
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <div className="modal-overlay">
+        <div className="route-modal-content">
+          <div className="route-modal-header">
+            <h2>
+              <i className="bi bi-geo-alt"></i>
+              Roteirização - {routeData?.technicianName}
+            </h2>
+            <button 
+              className="route-modal-close"
+              onClick={onClose}
+              title="Fechar"
+            >
+              <i className="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <div className="route-modal-body">
+            {loading && (
+              <div className="route-loading">
+                <div className="loading-spinner"></div>
+                <p>Carregando ordens de serviço...</p>
+                <span style={{ fontSize: '12px', color: '#9ca3af' }}>
+                  Preparando roteirização
+                </span>
+              </div>
+            )}
+
+            {error && (
+              <div className="route-error">
+                <i className="bi bi-exclamation-triangle"></i>
+                <p>{error}</p>
+              </div>
+            )}
+
+            {routeData && !loading && !error && (
+              <div className="route-routing-container">
+                {/* Coluna Esquerda - Ordens não roteirizadas */}
+                <div className="route-column unrouted-column">
+                  <div className="route-column-header">
+                    <h3>Não Roteirizadas</h3>
+                    <span className="route-count">{unroutedOrders.length}</span>
+                  </div>
+                  <div 
+                    className="route-column-content"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDropToUnrouted}
+                  >
+                    {unroutedOrders.length === 0 ? (
+                      <div className="route-empty-state">
+                        <p>Nenhuma ordem disponível</p>
+                      </div>
+                    ) : (
+                      <div className="route-orders-grouped">
+                        {(() => {
+                          const grouped = {};
+                          unroutedOrders.forEach(order => {
+                            const cidade = order.cidade || order.TB02115_CIDADE;
+                            const bairro = order.bairro || order.TB02115_BAIRRO;
+                            const cliente = order.cliente || order.TB01008_NOME;
+                            const endereco = order.endereco || order.TB02115_ENDERECO;
+                            
+                            // Agrupamento por cidade
+                            if (!grouped[cidade]) {
+                              grouped[cidade] = {
+                                cidade,
+                                bairros: {}
+                              };
+                            }
+                            
+                            // Sub-agrupamento por bairro dentro da cidade
+                            if (!grouped[cidade].bairros[bairro]) {
+                              grouped[cidade].bairros[bairro] = {
+                                bairro,
+                                clientes: {}
+                              };
+                            }
+                            
+                            // Sub-agrupamento por cliente dentro do bairro
+                            if (!grouped[cidade].bairros[bairro].clientes[cliente]) {
+                              grouped[cidade].bairros[bairro].clientes[cliente] = {
+                                cliente,
+                                endereco,
+                                orders: []
+                              };
+                            }
+                            grouped[cidade].bairros[bairro].clientes[cliente].orders.push(order);
+                          });
+                          return Object.values(grouped);
+                        })().map((cidadeGroup, cidadeIndex) => (
+                          <div key={cidadeIndex} className="route-client-group">
+                            <div className="route-client-info">
+                              <h4>{cidadeGroup.cidade}</h4>
+                            </div>
+                            {Object.values(cidadeGroup.bairros).map((bairroGroup, bairroIndex) => (
+                              <div key={bairroIndex} className="route-bairro-subgroup">
+                                <div className="route-bairro-info">
+                                  <p>Bairro: {bairroGroup.bairro}</p>
+                                </div>
+                                <div className="route-orders-badges">
+                                  {Object.values(bairroGroup.clientes).flatMap((clienteGroup, clienteIndex) =>
+                                    clienteGroup.orders.map((order, orderIndex) => (
+                                      <div
+                                        key={`${cidadeIndex}-${bairroIndex}-${clienteIndex}-${orderIndex}`}
+                                        className={`route-order-badge ${hasLinkedOrder(order) ? 'has-linked-order' : ''}`}
+                                        draggable
+                                        onDragStart={(e) => handleDragStart(e, order)}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOrderClick(order, e);
+                                        }}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        <span 
+                                          className="service-type-badge-compact"
+                                          style={{ backgroundColor: getServiceColor(getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA || 'N')) }}
+                                        >
+                                          {getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA || 'N')}
+                                        </span>
+                                        <span className="route-order-id-bold">{order.id || order.TB02115_CODIGO}</span>
+                                        {order.TB01010_RESUMIDO && <span className="route-order-resumido">{order.TB01010_RESUMIDO}</span>}
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Coluna Direita - Ordens roteirizadas */}
+                <div className="route-column routed-column">
+                  <div className="route-column-header">
+                    <h3>Roteirizadas</h3>
+                    <span className="route-count">{routedOrders.length}</span>
+                  </div>
+                  <div 
+                    className="route-column-content"
+                    onDragOver={handleDragOver}
+                    onDrop={handleDropToRouted}
+                  >
+                    {routedOrders.length === 0 ? (
+                      <div className="route-empty-state">
+                        <p>Arraste ordens para criar a rota</p>
+                      </div>
+                    ) : (
+                      <div className="route-orders-grouped">
+                        {(() => {
+                          const grouped = {};
+                          routedOrders.forEach(order => {
+                            const cidade = order.cidade || order.TB02115_CIDADE;
+                            const bairro = order.bairro || order.TB02115_BAIRRO;
+                            const cliente = order.cliente || order.TB01008_NOME;
+                            const endereco = order.endereco || order.TB02115_ENDERECO;
+                            
+                            // Agrupamento por cidade
+                            if (!grouped[cidade]) {
+                              grouped[cidade] = {
+                                cidade,
+                                bairros: {}
+                              };
+                            }
+                            
+                            // Sub-agrupamento por bairro dentro da cidade
+                            if (!grouped[cidade].bairros[bairro]) {
+                              grouped[cidade].bairros[bairro] = {
+                                bairro,
+                                clientes: {}
+                              };
+                            }
+                            
+                            // Sub-agrupamento por cliente dentro do bairro
+                            if (!grouped[cidade].bairros[bairro].clientes[cliente]) {
+                              grouped[cidade].bairros[bairro].clientes[cliente] = {
+                                cliente,
+                                endereco,
+                                orders: []
+                              };
+                            }
+                            grouped[cidade].bairros[bairro].clientes[cliente].orders.push(order);
+                          });
+                          return Object.values(grouped);
+                        })().map((cidadeGroup, cidadeIndex) => (
+                          <div key={cidadeIndex} className="route-client-group">
+                            <div className="route-client-info">
+                              <h4>{cidadeGroup.cidade}</h4>
+                            </div>
+                            {Object.values(cidadeGroup.bairros).map((bairroGroup, bairroIndex) => (
+                              <div key={bairroIndex} className="route-bairro-subgroup">
+                                <div className="route-bairro-info">
+                                  <p>Bairro: {bairroGroup.bairro}</p>
+                                </div>
+                                <div className="route-orders-badges">
+                                  {Object.values(bairroGroup.clientes).flatMap((clienteGroup, clienteIndex) =>
+                                    clienteGroup.orders.map((order, orderIndex) => {
+                                      const globalIndex = routedOrders.findIndex(o => 
+                                        o.id === order.id || o.TB02115_CODIGO === order.TB02115_CODIGO
+                                      );
+                                                                              return (
+                                          <div
+                                            key={`${cidadeIndex}-${bairroIndex}-${clienteIndex}-${orderIndex}`}
+                                            className={`route-order-badge ${hasLinkedOrder(order) ? 'has-linked-order' : ''}`}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, order)}
+                                            onDragOver={(e) => handleDragOverRouted(e, globalIndex)}
+                                            onDragLeave={handleDragLeave}
+                                            onDrop={(e) => handleDropInRouted(e, globalIndex)}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleOrderClick(order, e);
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                          >
+                                            <span className="route-order-number">{order.routeOrder}</span>
+                                            <span 
+                                              className="service-type-badge-compact"
+                                              style={{ backgroundColor: getServiceColor(getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA || 'N')) }}
+                                            >
+                                              {getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA || 'N')}
+                                            </span>
+                                            <span className="route-order-id-bold">{order.id || order.TB02115_CODIGO}</span>
+                                            {order.TB01010_RESUMIDO && <span className="route-order-resumido">{order.TB01010_RESUMIDO}</span>}
+                                          </div>
+                                        );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Modal de Tooltip */}
+        {showTooltip && tooltipOrder && (
+          <div 
+            className="order-tooltip-modal" 
+            onClick={closeTooltip}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10000
+            }}
+          >
+            <div 
+              className="order-tooltip-content" 
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'absolute',
+                left: tooltipPosition.x,
+                top: tooltipPosition.y,
+                transform: 'translateY(-50%)'
+              }}
+            >
+              <div className="order-tooltip-header">
+                <h3 className="order-tooltip-title">
+                  Ordem {tooltipOrder.id || tooltipOrder.TB02115_CODIGO}
+                </h3>
+                <button className="order-tooltip-close" onClick={closeTooltip}>
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              
+              <div className="order-tooltip-info">
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Previsão:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.previsao || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Contrato:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.contrato || tooltipOrder.TB02115_CONTRATO || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Equipamento:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.equipamento || tooltipOrder.TB01010_NOME || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Série:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.numeroSerie || tooltipOrder.serie || tooltipOrder.TB02115_NUMSERIE || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Motivo da OS:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.motivoOS || tooltipOrder.motivo || tooltipOrder.TB02115_NOME || 'N/A'}
+                  </span>
+                </div>
+                
+                <div className="order-tooltip-item">
+                  <span className="order-tooltip-label">Solicitante:</span>
+                  <span className="order-tooltip-value">
+                    {tooltipOrder.solicitante || tooltipOrder.TB02115_SOLICITANTE || 'N/A'}
+                  </span>
+                </div>
+                
+                {hasLinkedOrder(tooltipOrder) && (
+                  <div className="order-tooltip-item order-tooltip-linked-order">
+                    <span className="order-tooltip-label order-tooltip-linked-order-label">Pedido Vinculado:</span>
+                    <span className="order-tooltip-value order-tooltip-linked-order-value">
+                      {tooltipOrder.pedidoVinculado || tooltipOrder.TB02115_PEDIDO_VINCULADO || 'N/A'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -5379,6 +6319,141 @@ function App() {
       .map(([status, count]) => ({ status, count }))
       .sort((a, b) => a.status.localeCompare(b.status));
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.sla, selectedColumnFilters.equipamento]);
+
+  const slasWithCounts = React.useMemo(() => {
+    const filtered = getFilteredOrders;
+    const slaData = {};
+    
+    // Definir todos os SLAs possíveis para garantir ordem consistente
+    const allSLAs = ['Vencido', 'Vencendo', 'OK'];
+    allSLAs.forEach(sla => {
+      slaData[sla] = 0;
+    });
+    
+    if (dataSource === 'sql_server' && filtered.length > 0) {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
+            if (selectedColumnFilters.tipoOS.length > 0) {
+              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
+              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
+              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
+            if (selectedColumnFilters.equipamento.length > 0) {
+              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const calcRestante = ordem.CALC_RESTANTE || 0;
+            const sla = getSLAFromCalcRestante(calcRestante);
+            if (slaData.hasOwnProperty(sla)) {
+              slaData[sla] += 1;
+            }
+          });
+        }
+      });
+    } else {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
+            if (selectedColumnFilters.tipoOS.length > 0) {
+              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
+              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
+              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
+            if (selectedColumnFilters.equipamento.length > 0) {
+              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const calcRestante = ordem.CALC_RESTANTE || 0;
+            const sla = getSLAFromCalcRestante(calcRestante);
+            if (slaData.hasOwnProperty(sla)) {
+              slaData[sla] += 1;
+            }
+          });
+        }
+      });
+    }
+    
+    return allSLAs
+      .map(sla => ({ sla, count: slaData[sla] }))
+      .filter(item => item.count > 0); // Mostrar apenas SLAs que têm ordens
+  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
   // Componente dropdown de opções de filtro
   const FilterOptionsDropdown = ({ onSelectFilter, onClose }) => {
@@ -8038,6 +9113,22 @@ function App() {
 
       {/* Renderizar todos os modais de filtro de técnicos */}
       <TechnicianFilterModals />
+      
+      {/* Renderizar todos os modais de menu de técnicos */}
+      <TechnicianMenuModals />
+
+      {/* Modal de rota do técnico */}
+      <RouteModal 
+        isOpen={showRouteModal}
+        routeData={routeModalData}
+        loading={routeModalLoading}
+        error={routeModalError}
+        onClose={() => {
+          setShowRouteModal(false);
+          setRouteModalData(null);
+          setRouteModalError(null);
+        }}
+      />
 
       {/* Modal de detalhes da ordem de serviço */}
       {selectedOrderForDetails && (
