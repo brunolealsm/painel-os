@@ -3422,15 +3422,26 @@ function App() {
       
       // Buscar ordens roteirizadas do banco de dados
       const technicianId = validOrders[0]?.TB02115_CODTEC; // Usar o código do técnico da primeira ordem
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const forecastDate = tomorrow.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      // Usar a data atual, pois o usuário faz a roteirização um dia antes do roteiro
+      const today = new Date();
+      const forecastDate = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      
+      console.log(`🔍 Buscando ordens roteirizadas para hoje:`, {
+        technicianId,
+        forecastDate,
+        validOrdersCount: validOrders.length
+      });
       
       let routedOrders = [];
       if (technicianId) {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/route/technician-orders/${technicianId}?forecast=${forecastDate}`);
+          const apiUrl = `${API_BASE_URL}/api/route/technician-orders/${technicianId}?forecast=${forecastDate}`;
+          console.log(`🌐 Chamando API: ${apiUrl}`);
+          
+          const response = await fetch(apiUrl);
           const result = await response.json();
+          
+          console.log(`📡 Resposta da API:`, result);
           
           if (result.success) {
             routedOrders = result.data.orders;
@@ -3450,7 +3461,15 @@ function App() {
         const enderecoCompleto = endereco ? `${endereco}, ${cidade}` : cidade;
         
         // Verificar se a ordem está roteirizada
-        const routedOrder = routedOrders.find(ro => ro.os === (order.id || order.TB02115_CODIGO));
+        // Converter ambos para string para garantir comparação correta
+        const orderNumber = String(order.id || order.TB02115_CODIGO);
+        const routedOrder = routedOrders.find(ro => String(ro.os) === orderNumber);
+        
+        console.log(`🔍 Verificando ordem ${orderNumber}:`, {
+          orderNumber,
+          routedOrders: routedOrders.map(ro => ({ os: ro.os, sequence: ro.sequence })),
+          found: !!routedOrder
+        });
         
         return {
           ...order,
@@ -5187,6 +5206,154 @@ function App() {
       return order.pedidoVinculado || order.TB02115_PEDIDO_VINCULADO;
     };
 
+    // Função para imprimir o roteiro
+    const printRoute = () => {
+      if (routedOrders.length === 0) {
+        alert('Não há ordens roteirizadas para imprimir.');
+        return;
+      }
+
+      // Criar uma nova janela para impressão
+      const printWindow = window.open('', '_blank');
+      
+      // Calcular a data do próximo dia útil
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      
+      // Verificar se amanhã é fim de semana
+      const dayOfWeek = tomorrow.getDay();
+      let nextWorkDay = tomorrow;
+      if (dayOfWeek === 0) { // Domingo
+        nextWorkDay.setDate(tomorrow.getDate() + 1);
+      } else if (dayOfWeek === 6) { // Sábado
+        nextWorkDay.setDate(tomorrow.getDate() + 2);
+      }
+      
+      const nextWorkDayStr = nextWorkDay.toLocaleDateString('pt-BR');
+
+      // Ordenar ordens pela sequência
+      const sortedOrders = [...routedOrders].sort((a, b) => a.routeOrder - b.routeOrder);
+
+      const printContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Roteiro - ${routeData?.technicianName}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              margin: 20px;
+              font-size: 12px;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 30px;
+              border-bottom: 2px solid #333;
+              padding-bottom: 10px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 18px;
+              color: #333;
+            }
+            .header p {
+              margin: 5px 0;
+              font-size: 14px;
+              color: #666;
+            }
+            .order-item {
+              margin-bottom: 15px;
+              border: 1px solid #ddd;
+              padding: 10px;
+              page-break-inside: avoid;
+            }
+            .order-header {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 8px;
+              font-weight: bold;
+            }
+            .order-details {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 5px;
+              margin-bottom: 8px;
+            }
+            .order-detail {
+              display: flex;
+              align-items: center;
+            }
+            .order-detail strong {
+              min-width: 80px;
+              margin-right: 5px;
+            }
+            .order-address {
+              margin-top: 5px;
+              padding-top: 5px;
+              border-top: 1px solid #eee;
+              font-style: italic;
+              color: #666;
+            }
+            @media print {
+              body { margin: 0; }
+              .order-item { border: 1px solid #000; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${routeData?.technicianName}</h1>
+            <p>Roteiro para o próximo dia útil: ${nextWorkDayStr}</p>
+            <p>Total de ordens de serviço: ${sortedOrders.length}</p>
+          </div>
+          
+          ${sortedOrders.map((order, index) => {
+            const cliente = order.cliente || order.TB01008_NOME || 'N/A';
+            const equipamento = order.equipamento || order.TB01010_NOME || 'N/A';
+            const serie = order.serie || order.TB02115_NUMSERIE || 'N/A';
+            const pedidoVinculado = order.pedidoVinculado || order.TB02115_PEDIDO_VINCULADO || 'N/A';
+            const endereco = order.endereco || order.TB02115_ENDERECO || 'N/A';
+            
+            return `
+              <div class="order-item">
+                <div class="order-header">
+                  <span>${index + 1} >> ${order.id || order.TB02115_CODIGO}</span>
+                </div>
+                <div class="order-details">
+                  <div class="order-detail">
+                    <strong>Cliente:</strong> ${cliente}
+                  </div>
+                  <div class="order-detail">
+                    <strong>Equipamento:</strong> ${equipamento}
+                  </div>
+                  <div class="order-detail">
+                    <strong>Série:</strong> ${serie}
+                  </div>
+                  <div class="order-detail">
+                    <strong>Pedido:</strong> ${pedidoVinculado}
+                  </div>
+                </div>
+                <div class="order-address">
+                  <strong>Endereço:</strong> ${endereco}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </body>
+        </html>
+      `;
+
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      
+      // Aguardar o carregamento e imprimir
+      printWindow.onload = function() {
+        printWindow.print();
+        printWindow.close();
+      };
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -5229,8 +5396,8 @@ function App() {
                 {/* Coluna Esquerda - Ordens não roteirizadas */}
                 <div className="route-column unrouted-column">
                   <div className="route-column-header">
-                    <h3>Não Roteirizadas</h3>
                     <span className="route-count">{unroutedOrders.length}</span>
+                    <h3>Não Roteirizadas</h3>
                   </div>
                   <div 
                     className="route-column-content"
@@ -5326,8 +5493,16 @@ function App() {
                 {/* Coluna Direita - Ordens roteirizadas */}
                 <div className="route-column routed-column">
                   <div className="route-column-header">
-                    <h3>Roteirizadas</h3>
                     <span className="route-count">{routedOrders.length}</span>
+                    <h3>Roteirizadas</h3>
+                    <button 
+                      className="route-print-button"
+                      onClick={printRoute}
+                      title="Imprimir roteiro"
+                      disabled={routedOrders.length === 0}
+                    >
+                      <i className="bi bi-printer"></i>
+                    </button>
                   </div>
                   <div 
                     className="route-column-content"
@@ -7430,6 +7605,11 @@ function App() {
 
   // Modal de detalhes da ordem de serviço
   const OrderDetailsModal = ({ order, onClose }) => {
+    const [showDefeitoDetails, setShowDefeitoDetails] = React.useState(false);
+    const [defeitoData, setDefeitoData] = React.useState(null);
+    const [loadingDefeito, setLoadingDefeito] = React.useState(false);
+    const [defeitoError, setDefeitoError] = React.useState(null);
+
     if (!order) return null;
 
     // Debug temporário: verificar dados recebidos
@@ -7455,6 +7635,38 @@ function App() {
     // Dados de teste apenas para reincidência (campo não disponível no banco)
     const testData = {
       reincidencia: Math.random() > 0.7 ? 'Sim' : 'Não'
+    };
+
+    // Função para buscar detalhes do defeito
+    const fetchDefeitoDetails = async () => {
+      if (defeitoData) return; // Já carregado
+      
+      setLoadingDefeito(true);
+      setDefeitoError(null);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/orders/${order.id}/defeito`);
+        const result = await response.json();
+        
+        if (result.success) {
+          setDefeitoData(result.data);
+        } else {
+          setDefeitoError(result.message);
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar detalhes do defeito:', error);
+        setDefeitoError('Erro ao conectar com o servidor');
+      } finally {
+        setLoadingDefeito(false);
+      }
+    };
+
+    // Função para alternar exibição dos detalhes do defeito
+    const toggleDefeitoDetails = () => {
+      if (!showDefeitoDetails) {
+        fetchDefeitoDetails();
+      }
+      setShowDefeitoDetails(!showDefeitoDetails);
     };
 
     const getServiceTypeName = (tipo) => {
@@ -7600,8 +7812,56 @@ function App() {
 
                 <div className="order-detail-item">
                   <span className="order-detail-label">Motivo da OS:</span>
-                  <span className="order-detail-value">{order.motivoOS || 'Não informado'}</span>
+                  <div className="order-detail-with-action">
+                    <span className="order-detail-value">{order.motivoOS || 'Não informado'}</span>
+                    <button 
+                      className="order-detail-defeito-btn"
+                      onClick={toggleDefeitoDetails}
+                      title={showDefeitoDetails ? "Ocultar detalhes do defeito" : "Ver detalhes do defeito"}
+                    >
+                      <i className={`bi ${showDefeitoDetails ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
+                      {showDefeitoDetails ? 'Ocultar defeito' : 'Ver defeito'}
+                    </button>
+                  </div>
                 </div>
+
+                {/* Seção expandível dos detalhes do defeito */}
+                {showDefeitoDetails && (
+                  <div className="order-detail-defeito-section">
+                    {loadingDefeito && (
+                      <div className="defeito-loading">
+                        <i className="bi bi-clock-history"></i> Carregando detalhes do defeito...
+                      </div>
+                    )}
+                    
+                    {defeitoError && (
+                      <div className="defeito-error">
+                        <i className="bi bi-exclamation-triangle"></i> {defeitoError}
+                      </div>
+                    )}
+                    
+                    {defeitoData && !loadingDefeito && !defeitoError && (
+                      <div className="defeito-table-container">
+                        <table className="defeito-table">
+                          <thead>
+                            <tr>
+                              <th>Defeito</th>
+                              <th>Observação</th>
+                              <th>Solução</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td>{defeitoData.defeito}</td>
+                              <td>{defeitoData.observacao}</td>
+                              <td>{defeitoData.solucao}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="order-detail-item order-detail-item-simple">
                   <span className="order-detail-label">Solicitante:</span>
@@ -7838,6 +8098,7 @@ function App() {
     const [expandedCard, setExpandedCard] = useState(null);
     const [lastServiceData, setLastServiceData] = useState(null);
     const [historyData, setHistoryData] = useState([]);
+    const [defeitoData, setDefeitoData] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -7861,10 +8122,11 @@ function App() {
       setError(null);
 
       try {
-        // Buscar último atendimento e histórico em paralelo
-        const [lastServiceResponse, historyResponse] = await Promise.all([
-                  fetch(`http://localhost:3002/api/equipment/last-service/${order.numeroSerie}`),
-        fetch(`http://localhost:3002/api/equipment/history/${order.numeroSerie}`)
+        // Buscar último atendimento, histórico e defeito em paralelo
+        const [lastServiceResponse, historyResponse, defeitoResponse] = await Promise.all([
+          fetch(`http://localhost:3002/api/equipment/last-service/${order.numeroSerie}`),
+          fetch(`http://localhost:3002/api/equipment/history/${order.numeroSerie}`),
+          fetch(`http://localhost:3002/api/orders/${order.id}/defeito`)
         ]);
 
         if (!lastServiceResponse.ok || !historyResponse.ok) {
@@ -7873,6 +8135,7 @@ function App() {
 
         const lastServiceResult = await lastServiceResponse.json();
         const historyResult = await historyResponse.json();
+        const defeitoResult = defeitoResponse.ok ? await defeitoResponse.json() : null;
 
         if (lastServiceResult.success) {
           setLastServiceData(lastServiceResult.data);
@@ -7880,6 +8143,10 @@ function App() {
 
         if (historyResult.success) {
           setHistoryData(historyResult.data || []);
+        }
+
+        if (defeitoResult && defeitoResult.success) {
+          setDefeitoData(defeitoResult.data);
         }
 
       } catch (err) {
@@ -7962,6 +8229,19 @@ function App() {
                         {lastServiceData.ultimaOS} ({lastServiceData.ultimoTipo})
                       </span>
                     </div>
+                    <div className="equipment-sidebar-info-item compact">
+                      <span className="equipment-sidebar-label">Defeito:</span>
+                      <span className="equipment-sidebar-value">
+                        {defeitoData?.defeito || order.motivoOS || 'Não informado'}
+                      </span>
+                    </div>
+                    {defeitoData?.observacao && (
+                      <div className="equipment-sidebar-info-item compact">
+                        <div className="equipment-history-laudo">
+                          {defeitoData.observacao}
+                        </div>
+                      </div>
+                    )}
                     <div className="equipment-sidebar-info-item compact">
                       <span className="equipment-sidebar-label">Técnico:</span>
                       <span className="equipment-sidebar-value">{lastServiceData.ultimoTecnico}</span>
@@ -8047,6 +8327,19 @@ function App() {
                             </button>
                             
                             <div className="equipment-history-detail">
+                              <div className="equipment-history-detail-item compact">
+                                <span className="equipment-history-detail-label">Defeito:</span>
+                                <span className="equipment-history-detail-value">
+                                  {item.defeito || item.motivoOS || 'Não informado'}
+                                </span>
+                              </div>
+                              {item.observacao && (
+                                <div className="equipment-history-detail-item compact">
+                                  <div className="equipment-history-laudo">
+                                    {item.observacao}
+                                  </div>
+                                </div>
+                              )}
                               <div className="equipment-history-detail-item compact">
                                 <span className="equipment-history-detail-label">Condição:</span>
                                 <span className="equipment-history-detail-value">{item.condicao}</span>
@@ -8493,112 +8786,118 @@ function App() {
 
           <div className="board-section">
             <div className="kanban-board">
-              <div 
-                className={`kanban-column ${isDragOverOpen ? 'drop-target' : ''}`}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const orderId = e.dataTransfer.getData('orderId');
-                  const fromTechnician = e.dataTransfer.getData('fromTechnician');
-                  
-                  if (fromTechnician === 'true' && orderId) {
-                    handleReturnToOpen(orderId);
-                  }
-                  setIsDragOverOpen(false);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragOverOpen(true);
-                }}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  setIsDragOverOpen(false);
-                }}
-              >
-                <div className="column-header">
-                  <div className="column-title-section">
-                    <span className="column-title">Em aberto</span>
-                    <div className="column-filter-container">
-                      <button 
-                        className={`column-filter-icon ${(selectedColumnFilters.cidade.length > 0 || selectedColumnFilters.bairro.length > 0 || selectedColumnFilters.cliente.length > 0 || selectedColumnFilters.tipoOS.length > 0 || selectedColumnFilters.sla.length > 0 || selectedColumnFilters.equipamento.length > 0 || selectedColumnFilters.status.length > 0) ? 'active' : ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFilterOptions(!showFilterOptions);
-                          setShowColumnFilter(false);
-                        }}
-                        title="Filtrar dados da coluna"
-                      >
-                        <i className="bi bi-funnel"></i>
-                                  {(selectedColumnFilters.cidade.length > 0 || selectedColumnFilters.bairro.length > 0 || selectedColumnFilters.cliente.length > 0 || selectedColumnFilters.tipoOS.length > 0 || selectedColumnFilters.sla.length > 0 || selectedColumnFilters.equipamento.length > 0 || selectedColumnFilters.status.length > 0) && (
-                <span className="column-filter-badge">{selectedColumnFilters.cidade.length + selectedColumnFilters.bairro.length + selectedColumnFilters.cliente.length + selectedColumnFilters.tipoOS.length + selectedColumnFilters.sla.length + selectedColumnFilters.equipamento.length + selectedColumnFilters.status.length}</span>
+              {/* Coluna fixa "Em aberto" */}
+              <div className="kanban-fixed-column">
+                <div 
+                  className={`kanban-column ${isDragOverOpen ? 'drop-target' : ''}`}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const orderId = e.dataTransfer.getData('orderId');
+                    const fromTechnician = e.dataTransfer.getData('fromTechnician');
+                    
+                    if (fromTechnician === 'true' && orderId) {
+                      handleReturnToOpen(orderId);
+                    }
+                    setIsDragOverOpen(false);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOverOpen(true);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setIsDragOverOpen(false);
+                  }}
+                >
+                  <div className="column-header">
+                    <div className="column-title-section">
+                      <span className="column-title">Em aberto</span>
+                      <div className="column-filter-container">
+                        <button 
+                          className={`column-filter-icon ${(selectedColumnFilters.cidade.length > 0 || selectedColumnFilters.bairro.length > 0 || selectedColumnFilters.cliente.length > 0 || selectedColumnFilters.tipoOS.length > 0 || selectedColumnFilters.sla.length > 0 || selectedColumnFilters.equipamento.length > 0 || selectedColumnFilters.status.length > 0) ? 'active' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFilterOptions(!showFilterOptions);
+                            setShowColumnFilter(false);
+                          }}
+                          title="Filtrar dados da coluna"
+                        >
+                          <i className="bi bi-funnel"></i>
+                                    {(selectedColumnFilters.cidade.length > 0 || selectedColumnFilters.bairro.length > 0 || selectedColumnFilters.cliente.length > 0 || selectedColumnFilters.tipoOS.length > 0 || selectedColumnFilters.sla.length > 0 || selectedColumnFilters.equipamento.length > 0 || selectedColumnFilters.status.length > 0) && (
+                  <span className="column-filter-badge">{selectedColumnFilters.cidade.length + selectedColumnFilters.bairro.length + selectedColumnFilters.cliente.length + selectedColumnFilters.tipoOS.length + selectedColumnFilters.sla.length + selectedColumnFilters.equipamento.length + selectedColumnFilters.status.length}</span>
+                          )}
+                        </button>
+                        
+                        {showFilterOptions && (
+                          <div className="column-filter-overlay">
+                            <FilterOptionsDropdown 
+                              onSelectFilter={(filterType) => {
+                                setShowColumnFilter(true);
+                                setShowFilterOptions(false);
+                                // Store the selected filter type for the modal
+                                setSelectedFilterType(filterType);
+                              }}
+                              onClose={() => setShowFilterOptions(false)}
+                            />
+                          </div>
                         )}
-                      </button>
-                      
-                      {showFilterOptions && (
-                        <div className="column-filter-overlay">
-                          <FilterOptionsDropdown 
-                            onSelectFilter={(filterType) => {
-                              setShowColumnFilter(true);
-                              setShowFilterOptions(false);
-                              // Store the selected filter type for the modal
-                              setSelectedFilterType(filterType);
-                            }}
-                            onClose={() => setShowFilterOptions(false)}
-                          />
-                        </div>
-                      )}
-                      
-                      {showColumnFilter && (
-                        <div className="column-filter-overlay">
-                          <ColumnFilterModal 
-                            filterType={selectedFilterType}
-                            onClose={() => setShowColumnFilter(false)} 
-                          />
-                        </div>
-                      )}
+                        
+                        {showColumnFilter && (
+                          <div className="column-filter-overlay">
+                            <ColumnFilterModal 
+                              filterType={selectedFilterType}
+                              onClose={() => setShowColumnFilter(false)} 
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <span className="column-count">
+                      {getGroupedByCity.reduce((total, group) => total + group.ordens.length, 0)}
+                    </span>
                   </div>
-                  <span className="column-count">
-                    {getGroupedByCity.reduce((total, group) => total + group.ordens.length, 0)}
-                  </span>
-                </div>
-                <div className="column-content custom-scroll" ref={openColumnScrollRef}>
-                  {(() => {
-                    console.log('🔍 Renderizando coluna Em Aberto - getGroupedByCity:', getGroupedByCity);
-                    console.log('🔍 Renderizando coluna Em Aberto - length:', getGroupedByCity.length);
-                    return getGroupedByCity.map(group => (
-                      <CityGroup 
-                        key={group.cidade}
-                        cidade={group.cidade}
-                        ordens={group.ordens}
-                      />
-                    ));
-                  })()}
+                  <div className="column-content custom-scroll" ref={openColumnScrollRef}>
+                    {(() => {
+                      console.log('🔍 Renderizando coluna Em Aberto - getGroupedByCity:', getGroupedByCity);
+                      console.log('🔍 Renderizando coluna Em Aberto - length:', getGroupedByCity.length);
+                      return getGroupedByCity.map(group => (
+                        <CityGroup 
+                          key={group.cidade}
+                          cidade={group.cidade}
+                          ordens={group.ordens}
+                        />
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
 
-              {/* Mostrar colunas de técnicos apenas quando há filtros de equipe ativos */}
-              {hasActiveTeamFilters && columnOrder.map((technician, index) => (
-                <TechnicianColumn
-                  key={technician}
-                  technician={technician}
-                  orders={techniqueColumns[technician] || []}
-                  index={index}
-                />
-              ))}
+              {/* Área scrollável para colunas de técnicos */}
+              <div className="kanban-scrollable-area">
+                {/* Mostrar colunas de técnicos apenas quando há filtros de equipe ativos */}
+                {hasActiveTeamFilters && columnOrder.map((technician, index) => (
+                  <TechnicianColumn
+                    key={technician}
+                    technician={technician}
+                    orders={techniqueColumns[technician] || []}
+                    index={index}
+                  />
+                ))}
 
-              {/* Indicador quando não há filtros de equipe ativos */}
-              {!hasActiveTeamFilters && (
-                <div className="technician-columns-placeholder">
-                  <div className="placeholder-content">
-                    <i className="bi bi-people"></i>
-                    <p className="placeholder-title">Colunas de Técnicos</p>
-                    <p className="placeholder-description">
-                      Aplique filtros de <strong>Coordenador</strong>, <strong>Área</strong> ou <strong>Técnicos</strong> 
-                      para visualizar as colunas dos técnicos relacionados
-                    </p>
+                {/* Indicador quando não há filtros de equipe ativos */}
+                {!hasActiveTeamFilters && (
+                  <div className="technician-columns-placeholder">
+                    <div className="placeholder-content">
+                      <i className="bi bi-people"></i>
+                      <p className="placeholder-title">Colunas de Técnicos</p>
+                      <p className="placeholder-description">
+                        Aplique filtros de <strong>Coordenador</strong>, <strong>Área</strong> ou <strong>Técnicos</strong> 
+                        para visualizar as colunas dos técnicos relacionados
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </>
