@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Correções da Barra Lateral do Mapa</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: #f1f5f9;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .test-header h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 24px;
+        }
+        
+        .test-content {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #475569;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .test-info {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-info h3 {
+            margin: 0 0 10px 0;
+            color: #1e293b;
+            font-size: 16px;
+        }
+        
+        .test-info ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .test-info li {
+            margin-bottom: 5px;
+            color: #475569;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        .test-button.secondary {
+            background: #64748b;
+        }
+        
+        .test-button.secondary:hover {
+            background: #475569;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .fix-highlight {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .fix-highlight h4 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+        }
+        
+        .fix-highlight p {
+            margin: 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 Teste - Correções da Barra Lateral do Mapa</h1>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h2>Problemas Identificados e Correções</h2>
+                
+                <div class="fix-highlight">
+                    <h4>🚨 Problema 1: Ordens Ignoradas Fora do Brasil Não Apareciam</h4>
+                    <p><strong>Causa:</strong> O backend estava retornando <code>null</code> em vez de um objeto com flag <code>ignored</code> para coordenadas fora do Brasil.</p>
+                    <p><strong>Solução:</strong> Modificada a lógica do frontend para detectar ordens com coordenadas fora dos limites do Brasil usando a função <code>isValidBrazilianCoordinates()</code>.</p>
+                </div>
+                
+                <div class="fix-highlight">
+                    <h4>🚨 Problema 2: Botão de Reexibir Barra Lateral Ausente</h4>
+                    <p><strong>Causa:</strong> Quando a barra lateral estava recolhida, não havia botão para expandi-la novamente.</p>
+                    <p><strong>Solução:</strong> Melhorado o layout da barra lateral recolhida para mostrar o botão de toggle e o título de forma vertical.</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Correções Implementadas</h2>
+                
+                <div class="test-info">
+                    <h3>✅ 1. Detecção de Ordens Fora do Brasil</h3>
+                    <ul>
+                        <li>Adicionada função <code>isValidBrazilianCoordinates(lat, lng)</code> no frontend</li>
+                        <li>Modificada a lógica de filtro para detectar coordenadas fora do Brasil</li>
+                        <li>Agora as ordens com coordenadas fora do Brasil aparecem na seção "Fora do Brasil"</li>
+                        <li>Exibe as coordenadas encontradas que foram ignoradas</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>✅ 2. Botão de Reexibir Barra Lateral</h3>
+                    <ul>
+                        <li>Melhorado o layout da barra lateral quando recolhida</li>
+                        <li>O botão de toggle permanece visível e funcional</li>
+                        <li>Título da barra lateral aparece verticalmente quando recolhida</li>
+                        <li>Layout responsivo mantido para desktop e mobile</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>✅ 3. Melhorias Visuais</h3>
+                    <ul>
+                        <li>Barra lateral recolhida agora tem layout vertical</li>
+                        <li>Título rotacionado para melhor legibilidade</li>
+                        <li>Botão de toggle sempre acessível</li>
+                        <li>Transições suaves mantidas</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Como Testar as Correções</h2>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 1: Ordens Fora do Brasil</h3>
+                    <ul>
+                        <li>1. Abrir o frontend do PainelOS</li>
+                        <li>2. Ir para a tela de Roteirização</li>
+                        <li>3. Clicar no botão "Mapa" na coluna "Não Roteirizadas"</li>
+                        <li>4. Verificar se a barra lateral mostra TODAS as ordens não localizadas</li>
+                        <li>5. Verificar se há uma seção "Fora do Brasil" com ordens que têm coordenadas</li>
+                        <li>6. Verificar se essas ordens mostram as coordenadas encontradas</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 2: Botão de Reexibir</h3>
+                    <ul>
+                        <li>1. Na barra lateral do mapa, clicar no botão de seta para recolher</li>
+                        <li>2. Verificar se a barra fica recolhida (60px de largura)</li>
+                        <li>3. Verificar se o botão de seta ainda está visível</li>
+                        <li>4. Clicar no botão novamente para expandir</li>
+                        <li>5. Verificar se a barra volta ao tamanho normal</li>
+                        <li>6. Repetir o teste várias vezes para verificar a funcionalidade</li>
+                    </ul>
+                </div>
+                
+                <button class="test-button" onclick="window.open('http://localhost:3000', '_blank')">
+                    🌐 Abrir Frontend
+                </button>
+                
+                <button class="test-button secondary" onclick="window.open('http://localhost:3002', '_blank')">
+                    🔧 Verificar Backend
+                </button>
+            </div>
+            
+            <div class="test-section">
+                <h2>Status dos Testes</h2>
+                
+                <div class="test-info">
+                    <h3>🔍 Verificações Necessárias</h3>
+                    <ul>
+                        <li>
+                            <strong>Ordens fora do Brasil aparecem:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Botão de reexibir funciona:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Contador total correto:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Layout responsivo:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Código Implementado</h2>
+                
+                <div class="test-info">
+                    <h3>🔧 Função de Validação de Coordenadas</h3>
+                    <pre><code>const isValidBrazilianCoordinates = (lat, lng) => {
+  // Aproximadamente os limites do Brasil
+  return lat >= -33.7683 && lat <= 5.2717 && 
+         lng >= -73.9872 && lng <= -34.7299;
+};</code></pre>
+                </div>
+                
+                <div class="test-info">
+                    <h3>🔧 Filtro de Ordens Fora do Brasil</h3>
+                    <pre><code>const ordersIgnoredOutsideBrazil = unroutedOrders.filter(order => {
+  const orderId = order.id || order.TB02115_CODIGO;
+  const coordinates = coordinatesCache[orderId];
+  return coordinates && coordinates.lat && coordinates.lng && 
+         !isValidBrazilianCoordinates(coordinates.lat, coordinates.lng);
+});</code></pre>
+                </div>
+                
+                <div class="test-info">
+                    <h3>🔧 CSS da Barra Lateral Recolhida</h3>
+                    <pre><code>.route-map-sidebar.collapsed .sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 8px;
+}
+
+.route-map-sidebar.collapsed .sidebar-header h4 {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}</code></pre>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Resultado Esperado</h2>
+                
+                <div class="test-info">
+                    <h3>✅ Cenário de Sucesso</h3>
+                    <ul>
+                        <li><strong>8 ordens totais</strong> na tela de roteirização</li>
+                        <li><strong>4 ordens</strong> aparecem no mapa (coordenadas válidas no Brasil)</li>
+                        <li><strong>2 ordens</strong> na seção "Sem coordenadas" (não encontradas)</li>
+                        <li><strong>2 ordens</strong> na seção "Fora do Brasil" (coordenadas ignoradas)</li>
+                        <li><strong>Total: 4 ordens</strong> na barra lateral (2+2)</li>
+                        <li>Botão de expandir/recolher funciona perfeitamente</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Verificar se os serviços estão rodando
+        async function checkServices() {
+            try {
+                const backendResponse = await fetch('http://localhost:3002/api/health', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Backend está rodando');
+            } catch (error) {
+                console.log('❌ Backend não está acessível');
+            }
+            
+            try {
+                const frontendResponse = await fetch('http://localhost:3000', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Frontend está rodando');
+            } catch (error) {
+                console.log('❌ Frontend não está acessível');
+            }
+        }
+        
+        // Verificar serviços ao carregar a página
+        checkServices();
+        
+        // Função para simular a validação de coordenadas
+        function testBrazilianCoordinates() {
+            const testCases = [
+                { lat: -23.5505, lng: -46.6333, expected: true, desc: 'São Paulo' },
+                { lat: -22.9068, lng: -43.1729, expected: true, desc: 'Rio de Janeiro' },
+                { lat: 40.7128, lng: -74.0060, expected: false, desc: 'Nova York' },
+                { lat: 51.5074, lng: -0.1278, expected: false, desc: 'Londres' },
+                { lat: -15.7801, lng: -47.9292, expected: true, desc: 'Brasília' }
+            ];
+            
+            console.log('🧪 Testando validação de coordenadas brasileiras:');
+            testCases.forEach(test => {
+                const isValid = test.lat >= -33.7683 && test.lat <= 5.2717 && 
+                               test.lng >= -73.9872 && test.lng <= -34.7299;
+                console.log(`${test.desc}: ${isValid === test.expected ? '✅' : '❌'} (${test.lat}, ${test.lng})`);
+            });
+        }
+        
+        // Executar teste de coordenadas
+        testBrazilianCoordinates();
+    </script>
+</body>
+</html> 

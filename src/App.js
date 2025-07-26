@@ -3328,16 +3328,20 @@ function App() {
     setColumnOrder(newOrder);
   };
 
-  // Função para geocodificar endereços usando API gratuita e confiável
+  // Função para geocodificar endereços usando API do backend com cache
   const geocodeAddress = async (address) => {
     try {
-      // Usar API gratuita que permite CORS e é confiável
-      const url = `https://geocode.xyz/${encodeURIComponent(address)}?json=1&limit=1`;
-      
       console.log(`🌍 Fazendo geocodificação para: ${address}`);
-      console.log(`🔗 URL: ${url}`);
       
-      const response = await fetch(url);
+      const response = await fetch('/api/geocode/batch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          addresses: [{ orderId: 'temp', address }]
+        })
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -3346,36 +3350,19 @@ function App() {
       const data = await response.json();
       console.log(`📍 Resultado geocodificação:`, data);
       
-      if (data && data.latt && data.longt) {
-        return {
-          lat: parseFloat(data.latt),
-          lng: parseFloat(data.longt),
-          display_name: data.standard?.city || data.standard?.countryname || address
-        };
+      if (data.success && data.data && data.data.length > 0) {
+        const result = data.data[0];
+        if (result.lat && result.lng) {
+          return {
+            lat: result.lat,
+            lng: result.lng,
+            display_name: result.display_name || address
+          };
+        }
       }
       return null;
     } catch (error) {
       console.error('Erro ao geocodificar endereço:', error);
-      // Se falhar, tentar com uma API alternativa mais simples
-      try {
-        console.log('🔄 Tentando API alternativa...');
-        const alternativeUrl = `https://api.bigdatacloud.net/data/geocoding/latest?q=${encodeURIComponent(address)}&limit=1`;
-        const altResponse = await fetch(alternativeUrl);
-        
-        if (altResponse.ok) {
-          const altData = await altResponse.json();
-          if (altData && altData.length > 0) {
-            const result = altData[0];
-            return {
-              lat: parseFloat(result.latitude),
-              lng: parseFloat(result.longitude),
-              display_name: result.locality || address
-            };
-          }
-        }
-      } catch (altError) {
-        console.error('Erro na API alternativa:', altError);
-      }
       return null;
     }
   };
@@ -4904,6 +4891,24 @@ function App() {
     const [tooltipOrder, setTooltipOrder] = React.useState(null);
     const [showTooltip, setShowTooltip] = React.useState(false);
     const [tooltipPosition, setTooltipPosition] = React.useState({ x: 0, y: 0 });
+    
+    // Estados para geocodificação e cache
+    const [coordinatesCache, setCoordinatesCache] = React.useState({});
+    const [loadingCoordinates, setLoadingCoordinates] = React.useState({});
+    const [coordinatesError, setCoordinatesError] = React.useState({});
+    const [isLoadingAllCoordinates, setIsLoadingAllCoordinates] = React.useState(false);
+    
+    // Estados para o mapa de ordens não roteirizadas
+    const [showUnroutedMap, setShowUnroutedMap] = React.useState(false);
+    const [sidebarExpanded, setSidebarExpanded] = React.useState(true);
+    
+    // Função para validar se as coordenadas estão no Brasil
+    const isValidBrazilianCoordinates = (lat, lng) => {
+      // Aproximadamente os limites do Brasil
+      return lat >= -33.7683 && lat <= 5.2717 && lng >= -73.9872 && lng <= -34.7299;
+    };
+    const [mapTooltipOrder, setMapTooltipOrder] = React.useState(null);
+    const [mapTooltipPosition, setMapTooltipPosition] = React.useState({ x: 0, y: 0 });
 
     // Funções para mapear tipo de serviço e cores (consistentes com o resto da aplicação)
     const getServiceTypeFromPreventiva = (preventiva) => {
@@ -4958,6 +4963,35 @@ function App() {
         setRoutedOrders(routed);
       }
     }, [routeData]);
+
+    // Carregar coordenadas quando as ordens mudarem
+    React.useEffect(() => {
+      if (unroutedOrders.length > 0 || routedOrders.length > 0) {
+        // Aguardar um pouco para garantir que as ordens foram processadas
+        const timer = setTimeout(() => {
+          loadAllOrdersCoordinates();
+        }, 1000);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [unroutedOrders, routedOrders]);
+
+    // Carregar coordenadas quando o modal abrir e os dados estiverem disponíveis
+    React.useEffect(() => {
+      if (isOpen && routeData?.orders && routeData.orders.length > 0) {
+        console.log('🚀 Modal de roteirização aberto - iniciando carregamento de coordenadas');
+        
+        // Aguardar um pouco para garantir que as ordens foram processadas
+        const timer = setTimeout(() => {
+          const allOrders = [...unroutedOrders, ...routedOrders];
+          if (allOrders.length > 0) {
+            loadAllOrdersCoordinates();
+          }
+        }, 1500);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [isOpen, routeData]);
 
     const handleDragStart = (e, order) => {
       setDraggedOrder(order);
@@ -5174,7 +5208,7 @@ function App() {
       }
     };
 
-    const handleOrderClick = (order, event) => {
+    const handleOrderClick = async (order, event) => {
       const rect = event.currentTarget.getBoundingClientRect();
       
       // Debug: Log dos campos disponíveis na ordem
@@ -5195,6 +5229,12 @@ function App() {
       });
       setTooltipOrder(order);
       setShowTooltip(true);
+      
+      // Carregar coordenadas se ainda não estiverem no cache
+      const orderId = order.id || order.TB02115_CODIGO;
+      if (!coordinatesCache[orderId] && !loadingCoordinates[orderId]) {
+        await loadOrderCoordinates(order);
+      }
     };
 
     const closeTooltip = () => {
@@ -5205,6 +5245,376 @@ function App() {
     const hasLinkedOrder = (order) => {
       return order.pedidoVinculado || order.TB02115_PEDIDO_VINCULADO;
     };
+
+    // Função para carregar coordenadas de uma ordem específica
+    const loadOrderCoordinates = async (order) => {
+      const orderId = order.id || order.TB02115_CODIGO;
+      const endereco = order.endereco || order.TB02115_ENDERECO;
+      
+      if (!endereco) {
+        console.log(`⚠️ Ordem ${orderId} não possui endereço`);
+        return null;
+      }
+
+      // Verificar se já está no cache
+      if (coordinatesCache[orderId]) {
+        console.log(`✅ Coordenadas da ordem ${orderId} já estão em cache`);
+        return coordinatesCache[orderId];
+      }
+
+      // Verificar se já está carregando
+      if (loadingCoordinates[orderId]) {
+        console.log(`⏳ Coordenadas da ordem ${orderId} já estão carregando`);
+        return null;
+      }
+
+      console.log(`🌍 Carregando coordenadas para ordem ${orderId}: ${endereco}`);
+      
+      // Marcar como carregando
+      setLoadingCoordinates(prev => ({ ...prev, [orderId]: true }));
+      setCoordinatesError(prev => ({ ...prev, [orderId]: null }));
+
+      try {
+        const coordinates = await geocodeAddress(endereco);
+        
+        if (coordinates) {
+          console.log(`✅ Coordenadas carregadas para ordem ${orderId}:`, coordinates);
+          
+          // Salvar no cache
+          setCoordinatesCache(prev => ({
+            ...prev,
+            [orderId]: coordinates
+          }));
+          
+          return coordinates;
+        } else {
+          console.log(`❌ Não foi possível obter coordenadas para ordem ${orderId}`);
+          setCoordinatesError(prev => ({
+            ...prev,
+            [orderId]: 'Endereço não encontrado'
+          }));
+          return null;
+        }
+      } catch (error) {
+        console.error(`❌ Erro ao carregar coordenadas para ordem ${orderId}:`, error);
+        setCoordinatesError(prev => ({
+          ...prev,
+          [orderId]: error.message
+        }));
+        return null;
+      } finally {
+        setLoadingCoordinates(prev => ({ ...prev, [orderId]: false }));
+      }
+    };
+
+    // Função para carregar coordenadas de todas as ordens em lote
+    const loadAllOrdersCoordinates = async () => {
+      console.log(`🌍 Iniciando carregamento de coordenadas em lote`);
+      
+      // Evitar carregamento duplicado
+      if (isLoadingAllCoordinates) {
+        console.log('⏳ Carregamento de coordenadas já está em andamento');
+        return;
+      }
+      
+      setIsLoadingAllCoordinates(true);
+      
+      try {
+        // Usar routeData.orders como fonte principal, com fallback para as listas processadas
+        const ordersToProcess = routeData?.orders || [...unroutedOrders, ...routedOrders];
+        
+        if (!ordersToProcess || ordersToProcess.length === 0) {
+          console.log('⚠️ Nenhuma ordem encontrada para processar coordenadas');
+          return;
+        }
+        
+        console.log(`🌍 Processando ${ordersToProcess.length} ordens para coordenadas`);
+        
+        // Preparar endereços para geocodificação em lote
+        const addressesToGeocode = [];
+        
+        for (const order of ordersToProcess) {
+          const orderId = order.id || order.TB02115_CODIGO;
+          const endereco = order.endereco || order.TB02115_ENDERECO;
+          
+          if (endereco && !coordinatesCache[orderId] && !loadingCoordinates[orderId]) {
+            addressesToGeocode.push({
+              orderId,
+              address: endereco
+            });
+          } else if (coordinatesCache[orderId]) {
+            console.log(`✅ Ordem ${orderId} já tem coordenadas em cache`);
+          } else if (!endereco) {
+            console.log(`⚠️ Ordem ${orderId} não possui endereço`);
+          }
+        }
+        
+        if (addressesToGeocode.length === 0) {
+          console.log('✅ Nenhum endereço novo para geocodificar');
+          return;
+        }
+        
+        console.log(`🌍 Enviando ${addressesToGeocode.length} endereços para geocodificação em lote`);
+        
+        // Marcar todos como carregando
+        addressesToGeocode.forEach(({ orderId }) => {
+          setLoadingCoordinates(prev => ({ ...prev, [orderId]: true }));
+          setCoordinatesError(prev => ({ ...prev, [orderId]: null }));
+        });
+        
+        // Fazer requisição em lote para o backend
+        const response = await fetch('/api/geocode/batch', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            addresses: addressesToGeocode
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`📍 Resultado geocodificação em lote:`, data);
+        
+        if (data.success && data.data) {
+          // Processar resultados
+          data.data.forEach(result => {
+            const orderId = result.orderId;
+            
+            if (result.error) {
+              console.log(`❌ Erro para ordem ${orderId}: ${result.error}`);
+              setCoordinatesError(prev => ({
+                ...prev,
+                [orderId]: result.error
+              }));
+            } else if (result.lat && result.lng) {
+              console.log(`✅ Coordenadas carregadas para ordem ${orderId}:`, result);
+              
+              // Salvar no cache
+              setCoordinatesCache(prev => ({
+                ...prev,
+                [orderId]: {
+                  lat: result.lat,
+                  lng: result.lng,
+                  display_name: result.display_name || result.address
+                }
+              }));
+            }
+          });
+          
+          console.log(`✅ Geocodificação em lote concluída - ${data.data.length} endereços processados`);
+          console.log(`📊 Performance: ${data.performance?.totalTime}ms total, ${data.performance?.averageTimePerAddress}ms por endereço`);
+        }
+        
+      } catch (error) {
+        console.error('❌ Erro durante carregamento de coordenadas em lote:', error);
+        
+        // Marcar todos como erro
+        const ordersToProcess = routeData?.orders || [...unroutedOrders, ...routedOrders];
+        ordersToProcess.forEach(order => {
+          const orderId = order.id || order.TB02115_CODIGO;
+          if (loadingCoordinates[orderId]) {
+            setCoordinatesError(prev => ({
+              ...prev,
+              [orderId]: 'Erro na geocodificação em lote'
+            }));
+          }
+        });
+      } finally {
+        // Limpar estado de carregamento
+        setLoadingCoordinates({});
+        setIsLoadingAllCoordinates(false);
+      }
+    };
+
+    // Função para agrupar ordens por localização
+    const groupOrdersByLocation = (orders) => {
+      const groups = {};
+      const tolerance = 0.001; // Aproximadamente 100 metros
+      
+      orders.forEach(order => {
+        const orderId = order.id || order.TB02115_CODIGO;
+        const coordinates = coordinatesCache[orderId];
+        
+        if (coordinates && 
+            typeof coordinates.lat === 'number' && 
+            typeof coordinates.lng === 'number' && 
+            !isNaN(coordinates.lat) && 
+            !isNaN(coordinates.lng)) {
+          
+          // Criar chave de localização arredondada
+          const latKey = Math.round(coordinates.lat / tolerance) * tolerance;
+          const lngKey = Math.round(coordinates.lng / tolerance) * tolerance;
+          const locationKey = `${latKey},${lngKey}`;
+          
+          if (!groups[locationKey]) {
+            groups[locationKey] = {
+              coordinates: coordinates,
+              orders: []
+            };
+          }
+          
+          groups[locationKey].orders.push(order);
+        }
+      });
+      
+      return groups;
+    };
+
+    // Função para inicializar o mapa de ordens não roteirizadas
+    const initializeUnroutedMap = () => {
+      if (!window.L) {
+        console.error('❌ Leaflet não carregado');
+        return;
+      }
+
+      const mapElement = document.getElementById('unrouted-map');
+      if (!mapElement) {
+        console.error('❌ Elemento do mapa não encontrado');
+        return;
+      }
+
+      // Filtrar ordens com coordenadas disponíveis
+      const ordersWithCoordinates = unroutedOrders.filter(order => {
+        const orderId = order.id || order.TB02115_CODIGO;
+        return coordinatesCache[orderId];
+      });
+
+      if (ordersWithCoordinates.length === 0) {
+        console.log('⚠️ Nenhuma ordem com coordenadas disponível para exibir no mapa');
+        return;
+      }
+
+      // Agrupar ordens por localização
+      const locationGroups = groupOrdersByLocation(ordersWithCoordinates);
+      console.log(`🗺️ ${Object.keys(locationGroups).length} locais únicos encontrados`);
+
+      // Calcular centro do mapa baseado nas coordenadas disponíveis
+      const bounds = [];
+      const markers = [];
+      const brazilBounds = {
+        north: -5.0,  // Norte (Roraima)
+        south: -34.0, // Sul (Rio Grande do Sul)
+        east: -34.0,  // Leste (Rio Grande do Norte)
+        west: -74.0   // Oeste (Acre)
+      };
+
+      Object.entries(locationGroups).forEach(([locationKey, group]) => {
+        const coordinates = group.coordinates;
+        const orders = group.orders;
+        
+        if (coordinates && 
+            typeof coordinates.lat === 'number' && 
+            typeof coordinates.lng === 'number' && 
+            !isNaN(coordinates.lat) && 
+            !isNaN(coordinates.lng) &&
+            coordinates.lat >= -90 && coordinates.lat <= 90 &&
+            coordinates.lng >= -180 && coordinates.lng <= 180) {
+          
+          const position = [coordinates.lat, coordinates.lng];
+          bounds.push(position);
+
+          // Criar marcador personalizado com quantidade de ordens
+          const customIcon = window.L.divIcon({
+            className: 'custom-marker',
+            html: `
+              <div style="
+                width: ${orders.length > 9 ? '28px' : '24px'}; 
+                height: 24px; 
+                background: #ef4444; 
+                border: 2px solid white; 
+                border-radius: 50%; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                color: white; 
+                font-size: ${orders.length > 9 ? '9px' : '10px'}; 
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                cursor: pointer;
+              ">
+                ${orders.length}
+              </div>
+            `,
+            iconSize: [orders.length > 9 ? 28 : 24, 24],
+            iconAnchor: [orders.length > 9 ? 14 : 12, 12]
+          });
+
+          const marker = window.L.marker(position, { icon: customIcon });
+
+          // Adicionar evento de clique no marcador
+          marker.on('click', (event) => {
+            const rect = event.originalEvent.target.getBoundingClientRect();
+            setMapTooltipPosition({
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10
+            });
+            // Mostrar primeira ordem do grupo no tooltip
+            setMapTooltipOrder({
+              ...orders[0],
+              _locationGroup: orders // Adicionar todas as ordens do grupo
+            });
+          });
+
+          markers.push(marker);
+        } else {
+          console.warn(`⚠️ Coordenadas inválidas para localização ${locationKey}:`, coordinates);
+        }
+      });
+
+      // Criar mapa
+      const map = window.L.map('unrouted-map').setView(
+        bounds.length > 0 ? bounds[0] : [-23.5505, -46.6333], // São Paulo como fallback
+        12
+      );
+
+      // Adicionar camada de tiles do OpenStreetMap
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Adicionar marcadores ao mapa
+      markers.forEach(marker => {
+        marker.addTo(map);
+      });
+
+      // Filtrar apenas coordenadas brasileiras para o foco do mapa
+      const brazilianBounds = bounds.filter(position => {
+        const [lat, lng] = position;
+        return lat >= brazilBounds.south && lat <= brazilBounds.north &&
+               lng >= brazilBounds.west && lng <= brazilBounds.east;
+      });
+
+      // Ajustar zoom para mostrar apenas marcadores brasileiros
+      if (brazilianBounds.length > 1) {
+        map.fitBounds(brazilianBounds);
+      } else if (brazilianBounds.length === 1) {
+        // Se há apenas um ponto, centralizar nele com zoom apropriado
+        const [lat, lng] = brazilianBounds[0];
+        map.setView([lat, lng], 12);
+      } else {
+        // Centro padrão do Brasil se não houver coordenadas brasileiras
+        map.setView([-15.7801, -47.9292], 5);
+      }
+
+      console.log(`🗺️ Mapa OpenStreetMap inicializado com ${markers.length} marcadores`);
+    };
+
+    // useEffect para inicializar o mapa quando o modal abrir
+    React.useEffect(() => {
+      if (showUnroutedMap) {
+        // Aguardar um pouco para garantir que o DOM foi renderizado
+        const timer = setTimeout(() => {
+          initializeUnroutedMap();
+        }, 100);
+        
+        return () => clearTimeout(timer);
+      }
+    }, [showUnroutedMap, coordinatesCache, unroutedOrders]);
 
     // Função para imprimir o roteiro
     const printRoute = () => {
@@ -5360,10 +5770,18 @@ function App() {
       <div className="modal-overlay">
         <div className="route-modal-content">
           <div className="route-modal-header">
-            <h2>
-              <i className="bi bi-geo-alt"></i>
-              Roteirização - {routeData?.technicianName}
-            </h2>
+            <div className="route-modal-title-section">
+              <h2>
+                <i className="bi bi-geo-alt"></i>
+                Roteirização - {routeData?.technicianName}
+              </h2>
+              {isLoadingAllCoordinates && (
+                <div className="coordinates-loading-indicator">
+                  <i className="bi bi-arrow-repeat spin"></i>
+                  <span>Carregando coordenadas...</span>
+                </div>
+              )}
+            </div>
             <button 
               className="route-modal-close"
               onClick={onClose}
@@ -5396,8 +5814,19 @@ function App() {
                 {/* Coluna Esquerda - Ordens não roteirizadas */}
                 <div className="route-column unrouted-column">
                   <div className="route-column-header">
-                    <span className="route-count">{unroutedOrders.length}</span>
-                    <h3>Não Roteirizadas</h3>
+                    <div className="route-column-title-section">
+                      <span className="route-count">{unroutedOrders.length}</span>
+                      <h3>Não Roteirizadas</h3>
+                    </div>
+                    <button 
+                      className={`route-map-button ${unroutedOrders.length === 0 || isLoadingAllCoordinates ? 'disabled' : ''}`}
+                      onClick={() => setShowUnroutedMap(true)}
+                      disabled={unroutedOrders.length === 0 || isLoadingAllCoordinates}
+                      title={unroutedOrders.length === 0 ? 'Nenhuma ordem disponível' : isLoadingAllCoordinates ? 'Carregando coordenadas...' : 'Ver no mapa'}
+                    >
+                      <i className="bi bi-geo-alt"></i>
+                      <span>Mapa</span>
+                    </button>
                   </div>
                   <div 
                     className="route-column-content"
@@ -5684,6 +6113,67 @@ function App() {
                   </span>
                 </div>
                 
+                {/* Coordenadas */}
+                {(() => {
+                  const orderId = tooltipOrder.id || tooltipOrder.TB02115_CODIGO;
+                  const coordinates = coordinatesCache[orderId];
+                  const isLoading = loadingCoordinates[orderId];
+                  const error = coordinatesError[orderId];
+                  
+                  if (isLoading) {
+                    return (
+                      <div className="order-tooltip-item">
+                        <span className="order-tooltip-label">Coordenadas:</span>
+                        <span className="order-tooltip-value">
+                          <i className="bi bi-arrow-repeat spin" style={{ fontSize: '10px', marginRight: '4px' }}></i>
+                          Carregando...
+                        </span>
+                      </div>
+                    );
+                  }
+                  
+                  if (error) {
+                    return (
+                      <div className="order-tooltip-item">
+                        <span className="order-tooltip-label">Coordenadas:</span>
+                        <span className="order-tooltip-value" style={{ color: '#ef4444', fontSize: '10px' }}>
+                          <i className="bi bi-exclamation-triangle" style={{ marginRight: '4px' }}></i>
+                          Erro: {error}
+                        </span>
+                      </div>
+                    );
+                  }
+                  
+                  if (coordinates) {
+                    return (
+                      <>
+                        <div className="order-tooltip-item">
+                          <span className="order-tooltip-label">Latitude:</span>
+                          <span className="order-tooltip-value">
+                            {coordinates.lat.toFixed(6)}
+                          </span>
+                        </div>
+                        <div className="order-tooltip-item">
+                          <span className="order-tooltip-label">Longitude:</span>
+                          <span className="order-tooltip-value">
+                            {coordinates.lng.toFixed(6)}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  }
+                  
+                  return (
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Coordenadas:</span>
+                      <span className="order-tooltip-value" style={{ color: '#9ca3af', fontSize: '10px' }}>
+                        <i className="bi bi-geo-alt" style={{ marginRight: '4px' }}></i>
+                        Não disponível
+                      </span>
+                    </div>
+                  );
+                })()}
+                
                 {hasLinkedOrder(tooltipOrder) && (
                   <div className="order-tooltip-item order-tooltip-linked-order">
                     <span className="order-tooltip-label order-tooltip-linked-order-label">Pedido Vinculado:</span>
@@ -5694,6 +6184,360 @@ function App() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Modal do Mapa de Ordens Não Roteirizadas */}
+        {showUnroutedMap && (
+          <div className="modal-overlay">
+            <div className="route-map-modal-content">
+              <div className="route-map-modal-header">
+                <div className="route-map-modal-title-section">
+                  <h2>
+                    <i className="bi bi-geo-alt"></i>
+                    Mapa - Ordens Não Roteirizadas
+                  </h2>
+                  {(() => {
+                    const ordersWithCoordinates = unroutedOrders.filter(order => {
+                      const orderId = order.id || order.TB02115_CODIGO;
+                      return coordinatesCache[orderId];
+                    });
+                    
+                    const ordersWithoutCoordinates = unroutedOrders.filter(order => {
+                      const orderId = order.id || order.TB02115_CODIGO;
+                      return !coordinatesCache[orderId];
+                    });
+                    
+                    const locationGroups = groupOrdersByLocation(ordersWithCoordinates);
+                    const uniqueLocations = Object.keys(locationGroups).length;
+                    
+                    return (
+                      <div className="route-map-info">
+                        <span className="route-map-count">
+                          {uniqueLocations} pontos no mapa
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <button 
+                  className="route-modal-close"
+                  onClick={() => setShowUnroutedMap(false)}
+                  title="Fechar"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+
+              <div className="route-map-modal-body">
+                <div className="route-map-layout">
+                  <div className="route-map-container">
+                    <div id="unrouted-map" className="route-map"></div>
+                  </div>
+                  
+                  {/* Painel lateral com ordens não localizadas e ignoradas fora do Brasil */}
+                  {(() => {
+                    const ordersWithoutCoordinates = unroutedOrders.filter(order => {
+                      const orderId = order.id || order.TB02115_CODIGO;
+                      return !coordinatesCache[orderId];
+                    });
+                    
+                    const ordersIgnoredOutsideBrazil = unroutedOrders.filter(order => {
+                      const orderId = order.id || order.TB02115_CODIGO;
+                      const coordinates = coordinatesCache[orderId];
+                      // Verificar se tem coordenadas mas não está no mapa (ignorada fora do Brasil)
+                      return coordinates && coordinates.lat && coordinates.lng && 
+                             !isValidBrazilianCoordinates(coordinates.lat, coordinates.lng);
+                    });
+                    
+                    const totalUnlocatedOrders = ordersWithoutCoordinates.length + ordersIgnoredOutsideBrazil.length;
+                    
+                    if (totalUnlocatedOrders > 0) {
+                      return (
+                        <div className={`route-map-sidebar ${sidebarExpanded ? 'expanded' : 'collapsed'}`}>
+                          <div className="sidebar-header">
+                            <div className="sidebar-title-section">
+                              <h4>
+                                <i className="bi bi-exclamation-triangle"></i>
+                                Ordens não localizadas ({totalUnlocatedOrders})
+                              </h4>
+                              <button 
+                                className="sidebar-toggle-btn"
+                                onClick={() => setSidebarExpanded(!sidebarExpanded)}
+                                title={sidebarExpanded ? 'Recolher painel' : 'Expandir painel'}
+                              >
+                                <i className={`bi ${sidebarExpanded ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {sidebarExpanded && (
+                            <div className="sidebar-content">
+                              <div className="unlocated-orders-list">
+                                {/* Ordens sem coordenadas */}
+                                {ordersWithoutCoordinates.length > 0 && (
+                                  <div className="unlocated-section">
+                                    <div className="unlocated-section-header">
+                                      <h5>
+                                        <i className="bi bi-question-circle"></i>
+                                        Sem coordenadas ({ordersWithoutCoordinates.length})
+                                      </h5>
+                                    </div>
+                                    {ordersWithoutCoordinates.map((order, index) => (
+                                      <div key={`no-coords-${index}`} className="unlocated-order-item">
+                                        <div className="unlocated-order-header">
+                                          <span className="unlocated-order-number">
+                                            OS {order.id || order.TB02115_CODIGO}
+                                          </span>
+                                          <span className="unlocated-order-type">
+                                            {getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA)}
+                                          </span>
+                                        </div>
+                                        <div className="unlocated-order-details">
+                                          <div className="unlocated-order-cliente">
+                                            {order.cliente || order.TB02115_CLIENTE || 'N/A'}
+                                          </div>
+                                          <div className="unlocated-order-equipamento">
+                                            {order.equipamento || order.TB01010_NOME || 'N/A'}
+                                          </div>
+                                          <div className="unlocated-order-address">
+                                            {order.endereco || order.TB02115_ENDERECO || 'N/A'}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {/* Ordens ignoradas fora do Brasil */}
+                                {ordersIgnoredOutsideBrazil.length > 0 && (
+                                  <div className="unlocated-section">
+                                    <div className="unlocated-section-header">
+                                      <h5>
+                                        <i className="bi bi-globe"></i>
+                                        Fora do Brasil ({ordersIgnoredOutsideBrazil.length})
+                                      </h5>
+                                    </div>
+                                    {ordersIgnoredOutsideBrazil.map((order, index) => {
+                                      const orderId = order.id || order.TB02115_CODIGO;
+                                      const coordinates = coordinatesCache[orderId];
+                                      return (
+                                        <div key={`outside-brazil-${index}`} className="unlocated-order-item outside-brazil">
+                                          <div className="unlocated-order-header">
+                                            <span className="unlocated-order-number">
+                                              OS {order.id || order.TB02115_CODIGO}
+                                            </span>
+                                            <span className="unlocated-order-type">
+                                              {getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA)}
+                                            </span>
+                                          </div>
+                                          <div className="unlocated-order-details">
+                                            <div className="unlocated-order-cliente">
+                                              {order.cliente || order.TB02115_CLIENTE || 'N/A'}
+                                            </div>
+                                            <div className="unlocated-order-equipamento">
+                                              {order.equipamento || order.TB01010_NOME || 'N/A'}
+                                            </div>
+                                            <div className="unlocated-order-address">
+                                              {order.endereco || order.TB02115_ENDERECO || 'N/A'}
+                                            </div>
+                                            {coordinates && (
+                                              <div className="unlocated-order-coordinates">
+                                                <small>
+                                                  <i className="bi bi-geo-alt"></i>
+                                                  Coordenadas encontradas: {coordinates.lat}, {coordinates.lng}
+                                                </small>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Tooltip do mapa */}
+            {mapTooltipOrder && (
+              <div 
+                className="order-tooltip-modal" 
+                onClick={() => setMapTooltipOrder(null)}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 10001
+                }}
+              >
+                <div 
+                  className="order-tooltip-content" 
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    position: 'absolute',
+                    left: mapTooltipPosition.x,
+                    top: mapTooltipPosition.y,
+                    transform: 'translateY(-50%)'
+                  }}
+                >
+                  <div className="order-tooltip-header">
+                    <h3 className="order-tooltip-title">
+                      {mapTooltipOrder._locationGroup ? 
+                        `${mapTooltipOrder._locationGroup.length} ordens no local` : 
+                        `Ordem ${mapTooltipOrder.id || mapTooltipOrder.TB02115_CODIGO}`
+                      }
+                    </h3>
+                    <button className="order-tooltip-close" onClick={() => setMapTooltipOrder(null)}>
+                      <i className="bi bi-x-lg"></i>
+                    </button>
+                  </div>
+                  
+                  <div className="order-tooltip-info">
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Previsão:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.previsao || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Contrato:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.contrato || mapTooltipOrder.TB02115_CONTRATO || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Equipamento:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.equipamento || mapTooltipOrder.TB01010_NOME || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Série:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.numeroSerie || mapTooltipOrder.serie || mapTooltipOrder.TB02115_NUMSERIE || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Motivo da OS:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.motivoOS || mapTooltipOrder.motivo || mapTooltipOrder.TB02115_NOME || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    <div className="order-tooltip-item">
+                      <span className="order-tooltip-label">Solicitante:</span>
+                      <span className="order-tooltip-value">
+                        {mapTooltipOrder.solicitante || mapTooltipOrder.TB02115_SOLICITANTE || 'N/A'}
+                      </span>
+                    </div>
+                    
+                    {/* Lista de ordens do grupo (se houver múltiplas) */}
+                    {mapTooltipOrder._locationGroup && mapTooltipOrder._locationGroup.length > 1 && (
+                      <div className="order-tooltip-group">
+                        <span className="order-tooltip-label">Ordens no local:</span>
+                        <div className="order-tooltip-orders-list">
+                          {mapTooltipOrder._locationGroup.map((order, index) => (
+                            <div key={index} className="order-tooltip-order-item">
+                              <span className="order-tooltip-order-number">
+                                OS {order.id || order.TB02115_CODIGO}
+                              </span>
+                              <span className="order-tooltip-order-type">
+                                {getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Coordenadas */}
+                    {(() => {
+                      const orderId = mapTooltipOrder.id || mapTooltipOrder.TB02115_CODIGO;
+                      const coordinates = coordinatesCache[orderId];
+                      const isLoading = loadingCoordinates[orderId];
+                      const error = coordinatesError[orderId];
+                      
+                      if (isLoading) {
+                        return (
+                          <div className="order-tooltip-item">
+                            <span className="order-tooltip-label">Coordenadas:</span>
+                            <span className="order-tooltip-value">
+                              <i className="bi bi-arrow-repeat spin" style={{ fontSize: '10px', marginRight: '4px' }}></i>
+                              Carregando...
+                            </span>
+                          </div>
+                        );
+                      }
+                      
+                      if (error) {
+                        return (
+                          <div className="order-tooltip-item">
+                            <span className="order-tooltip-label">Coordenadas:</span>
+                            <span className="order-tooltip-value" style={{ color: '#ef4444', fontSize: '10px' }}>
+                              <i className="bi bi-exclamation-triangle" style={{ marginRight: '4px' }}></i>
+                              Erro: {error}
+                            </span>
+                          </div>
+                        );
+                      }
+                      
+                      if (coordinates) {
+                        return (
+                          <>
+                            <div className="order-tooltip-item">
+                              <span className="order-tooltip-label">Latitude:</span>
+                              <span className="order-tooltip-value">
+                                {coordinates.lat.toFixed(6)}
+                              </span>
+                            </div>
+                            <div className="order-tooltip-item">
+                              <span className="order-tooltip-label">Longitude:</span>
+                              <span className="order-tooltip-value">
+                                {coordinates.lng.toFixed(6)}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      }
+                      
+                      return (
+                        <div className="order-tooltip-item">
+                          <span className="order-tooltip-label">Coordenadas:</span>
+                          <span className="order-tooltip-value" style={{ color: '#9ca3af', fontSize: '10px' }}>
+                            <i className="bi bi-geo-alt" style={{ marginRight: '4px' }}></i>
+                            Não disponível
+                          </span>
+                        </div>
+                      );
+                    })()}
+                    
+                    {hasLinkedOrder(mapTooltipOrder) && (
+                      <div className="order-tooltip-item order-tooltip-linked-order">
+                        <span className="order-tooltip-label order-tooltip-linked-order-label">Pedido Vinculado:</span>
+                        <span className="order-tooltip-value order-tooltip-linked-order-value">
+                          {mapTooltipOrder.pedidoVinculado || mapTooltipOrder.TB02115_PEDIDO_VINCULADO || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -8124,9 +8968,9 @@ function App() {
       try {
         // Buscar último atendimento, histórico e defeito em paralelo
         const [lastServiceResponse, historyResponse, defeitoResponse] = await Promise.all([
-          fetch(`http://localhost:3002/api/equipment/last-service/${order.numeroSerie}`),
-          fetch(`http://localhost:3002/api/equipment/history/${order.numeroSerie}`),
-          fetch(`http://localhost:3002/api/orders/${order.id}/defeito`)
+          fetch(`/api/equipment/last-service/${order.numeroSerie}`),
+          fetch(`/api/equipment/history/${order.numeroSerie}`),
+          fetch(`/api/orders/${order.id}/defeito`)
         ]);
 
         if (!lastServiceResponse.ok || !historyResponse.ok) {
