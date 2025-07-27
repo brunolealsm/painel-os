@@ -5357,6 +5357,11 @@ function App() {
     const [showUnroutedMap, setShowUnroutedMap] = React.useState(false);
     const [sidebarExpanded, setSidebarExpanded] = React.useState(true);
     
+    // Estados para roteirização no mapa
+    const [selectedMapOrders, setSelectedMapOrders] = React.useState([]);
+    const [mapRoutedOrders, setMapRoutedOrders] = React.useState([]);
+    const [mapRoutedSequence, setMapRoutedSequence] = React.useState(1);
+    
     // Função para validar se as coordenadas estão no Brasil
     const isValidBrazilianCoordinates = (lat, lng) => {
       // Aproximadamente os limites do Brasil
@@ -5364,6 +5369,161 @@ function App() {
     };
     const [mapTooltipOrder, setMapTooltipOrder] = React.useState(null);
     const [mapTooltipPosition, setMapTooltipPosition] = React.useState({ x: 0, y: 0 });
+
+    // Funções para gerenciar roteirização no mapa
+    const addOrderToMapRoute = (order) => {
+      // Se a ordem tem grupo de localização, adicionar todas as ordens do grupo
+      if (order._locationGroup && order._locationGroup.length > 1) {
+        console.log(`🗺️ Adicionando ${order._locationGroup.length} ordens do grupo à rota`);
+        
+        const ordersToAdd = [];
+        let currentSequence = mapRoutedSequence;
+        
+        order._locationGroup.forEach(groupOrder => {
+          const groupOrderId = groupOrder.id || groupOrder.TB02115_CODIGO;
+          
+          // Verificar se a ordem já está na rota
+          const isAlreadyRouted = mapRoutedOrders.find(routed => 
+            (routed.id || routed.TB02115_CODIGO) === groupOrderId
+          );
+          
+          if (!isAlreadyRouted) {
+            // Adicionar ordem à lista de ordens para adicionar
+            const newRoutedOrder = {
+              ...groupOrder,
+              routeSequence: currentSequence,
+              routeOrder: currentSequence
+            };
+            
+            ordersToAdd.push(newRoutedOrder);
+            currentSequence++;
+          }
+        });
+        
+        if (ordersToAdd.length > 0) {
+          setMapRoutedOrders(prev => [...prev, ...ordersToAdd]);
+          setMapRoutedSequence(currentSequence);
+          
+          // Marcar todas como selecionadas
+          const orderIds = ordersToAdd.map(order => order.id || order.TB02115_CODIGO);
+          setSelectedMapOrders(prev => [...prev, ...orderIds]);
+        }
+      } else {
+        // Adicionar ordem individual
+        const orderId = order.id || order.TB02115_CODIGO;
+        
+        // Verificar se a ordem já está na rota
+        const isAlreadyRouted = mapRoutedOrders.find(routed => 
+          (routed.id || routed.TB02115_CODIGO) === orderId
+        );
+        
+        if (isAlreadyRouted) {
+          return; // Ordem já está na rota
+        }
+        
+        // Adicionar ordem à rota com sequência
+        const newRoutedOrder = {
+          ...order,
+          routeSequence: mapRoutedSequence,
+          routeOrder: mapRoutedSequence
+        };
+        
+        setMapRoutedOrders(prev => [...prev, newRoutedOrder]);
+        setMapRoutedSequence(prev => prev + 1);
+        
+        // Marcar como selecionada
+        setSelectedMapOrders(prev => [...prev, orderId]);
+      }
+    };
+
+    const removeOrderFromMapRoute = (order) => {
+      const orderId = order.id || order.TB02115_CODIGO;
+      
+      // Se a ordem tem grupo de localização, remover todas as ordens do grupo
+      if (order._locationGroup && order._locationGroup.length > 1) {
+        console.log(`🗺️ Removendo ${order._locationGroup.length} ordens do grupo da rota`);
+        
+        const groupOrderIds = order._locationGroup.map(groupOrder => 
+          groupOrder.id || groupOrder.TB02115_CODIGO
+        );
+        
+        // Remover todas as ordens do grupo da rota
+        setMapRoutedOrders(prev => prev.filter(routed => 
+          !groupOrderIds.includes(routed.id || routed.TB02115_CODIGO)
+        ));
+        
+        // Remover todas da seleção
+        setSelectedMapOrders(prev => prev.filter(id => !groupOrderIds.includes(id)));
+        
+        // Reordenar sequência
+        const remainingOrders = mapRoutedOrders.filter(routed => 
+          !groupOrderIds.includes(routed.id || routed.TB02115_CODIGO)
+        );
+        
+        const reorderedOrders = remainingOrders.map((order, index) => ({
+          ...order,
+          routeSequence: index + 1,
+          routeOrder: index + 1
+        }));
+        
+        setMapRoutedOrders(reorderedOrders);
+        setMapRoutedSequence(reorderedOrders.length + 1);
+      } else {
+        // Remover ordem individual
+        setMapRoutedOrders(prev => prev.filter(routed => 
+          (routed.id || routed.TB02115_CODIGO) !== orderId
+        ));
+        
+        // Remover da seleção
+        setSelectedMapOrders(prev => prev.filter(id => id !== orderId));
+        
+        // Reordenar sequência
+        const remainingOrders = mapRoutedOrders.filter(routed => 
+          (routed.id || routed.TB02115_CODIGO) !== orderId
+        );
+        
+        const reorderedOrders = remainingOrders.map((order, index) => ({
+          ...order,
+          routeSequence: index + 1,
+          routeOrder: index + 1
+        }));
+        
+        setMapRoutedOrders(reorderedOrders);
+        setMapRoutedSequence(reorderedOrders.length + 1);
+      }
+    };
+
+    const isOrderInMapRoute = (order) => {
+      const orderId = order.id || order.TB02115_CODIGO;
+      
+      // Se a ordem tem grupo de localização, verificar se alguma ordem do grupo está na rota
+      if (order._locationGroup && order._locationGroup.length > 1) {
+        return order._locationGroup.some(groupOrder => {
+          const groupOrderId = groupOrder.id || groupOrder.TB02115_CODIGO;
+          return mapRoutedOrders.find(routed => 
+            (routed.id || routed.TB02115_CODIGO) === groupOrderId
+          );
+        });
+      } else {
+        // Verificar ordem individual
+        return mapRoutedOrders.find(routed => 
+          (routed.id || routed.TB02115_CODIGO) === orderId
+        );
+      }
+    };
+
+    const getMapRouteProgress = () => {
+      const totalAvailable = unroutedOrders.length;
+      const totalRouted = mapRoutedOrders.length;
+      const remaining = totalAvailable - totalRouted;
+      
+      return {
+        total: totalAvailable,
+        routed: totalRouted,
+        remaining: remaining,
+        percentage: totalAvailable > 0 ? Math.round((totalRouted / totalAvailable) * 100) : 0
+      };
+    };
 
     // Funções para mapear tipo de serviço e cores (consistentes com o resto da aplicação)
     const getServiceTypeFromPreventiva = (preventiva) => {
@@ -5447,6 +5607,22 @@ function App() {
         return () => clearTimeout(timer);
       }
     }, [isOpen, routeData]);
+
+    // Limpar roteirização quando o modal for fechado
+    React.useEffect(() => {
+      if (!isOpen) {
+        setMapRoutedOrders([]);
+        setSelectedMapOrders([]);
+        setMapRoutedSequence(1);
+        setMapTooltipOrder(null);
+        
+        // Limpar instância do mapa
+        if (window.mapInstance) {
+          window.mapInstance.remove();
+          window.mapInstance = null;
+        }
+      }
+    }, [isOpen]);
 
     const handleDragStart = (e, order) => {
       setDraggedOrder(order);
@@ -5973,6 +6149,9 @@ function App() {
           const position = [coordinates.lat, coordinates.lng];
           bounds.push(position);
 
+          // Verificar se alguma ordem do grupo está na rota
+          const hasRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          
           // Criar marcador personalizado com quantidade de ordens
           const customIcon = window.L.divIcon({
             className: 'custom-marker',
@@ -5980,7 +6159,7 @@ function App() {
               <div style="
                 width: ${orders.length > 9 ? '28px' : '24px'}; 
                 height: 24px; 
-                background: #ef4444; 
+                background: ${hasRoutedOrders ? '#10b981' : '#ef4444'}; 
                 border: 2px solid white; 
                 border-radius: 50%; 
                 display: flex; 
@@ -6027,6 +6206,9 @@ function App() {
         12
       );
 
+      // Armazenar instância do mapa globalmente
+      window.mapInstance = map;
+
       // Adicionar camada de tiles do OpenStreetMap
       window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
@@ -6059,6 +6241,114 @@ function App() {
       console.log(`🗺️ Mapa OpenStreetMap inicializado com ${markers.length} marcadores`);
     };
 
+    // Função para atualizar apenas os marcadores sem reinicializar o mapa
+    const updateMapMarkers = () => {
+      if (!window.mapInstance) {
+        console.log('⚠️ Mapa não inicializado, pulando atualização de marcadores');
+        return;
+      }
+
+      console.log('🔄 Atualizando marcadores do mapa');
+      
+      // Remover todos os marcadores existentes
+      window.mapInstance.eachLayer((layer) => {
+        if (layer instanceof window.L.Marker) {
+          window.mapInstance.removeLayer(layer);
+        }
+      });
+
+      // Verificar se há ordens com coordenadas
+      const ordersWithCoordinates = unroutedOrders.filter(order => {
+        const orderId = order.id || order.TB02115_CODIGO;
+        return coordinatesCache[orderId];
+      });
+      
+      if (ordersWithCoordinates.length === 0) {
+        console.log('⚠️ Nenhuma ordem com coordenadas disponível para atualizar marcadores');
+        return;
+      }
+      
+      // Agrupar ordens por localização
+      const locationGroups = groupOrdersByLocation(ordersWithCoordinates);
+      const bounds = [];
+      
+      // Limites do Brasil para filtro
+      const brazilBounds = {
+        north: -5.0,
+        south: -34.0,
+        east: -34.0,
+        west: -74.0
+      };
+      
+      Object.entries(locationGroups).forEach(([locationKey, group]) => {
+        const coordinates = group.coordinates;
+        const orders = group.orders;
+        
+        if (coordinates && 
+            typeof coordinates.lat === 'number' && 
+            typeof coordinates.lng === 'number' && 
+            !isNaN(coordinates.lat) && 
+            !isNaN(coordinates.lng) &&
+            coordinates.lat >= -90 && coordinates.lat <= 90 &&
+            coordinates.lng >= -180 && coordinates.lng <= 180) {
+          
+          const position = [coordinates.lat, coordinates.lng];
+          bounds.push(position);
+
+          // Verificar se alguma ordem do grupo está na rota
+          const hasRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          
+          // Criar marcador personalizado com quantidade de ordens
+          const customIcon = window.L.divIcon({
+            className: 'custom-marker',
+            html: `
+              <div style="
+                width: ${orders.length > 9 ? '28px' : '24px'}; 
+                height: 24px; 
+                background: ${hasRoutedOrders ? '#10b981' : '#ef4444'}; 
+                border: 2px solid white; 
+                border-radius: 50%; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                color: white; 
+                font-size: ${orders.length > 9 ? '9px' : '10px'}; 
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                cursor: pointer;
+              ">
+                ${orders.length}
+              </div>
+            `,
+            iconSize: [orders.length > 9 ? 28 : 24, 24],
+            iconAnchor: [orders.length > 9 ? 14 : 12, 12]
+          });
+
+          const marker = window.L.marker(position, { icon: customIcon });
+
+          // Adicionar evento de clique no marcador
+          marker.on('click', (event) => {
+            const rect = event.originalEvent.target.getBoundingClientRect();
+            setMapTooltipPosition({
+              x: rect.left + rect.width / 2,
+              y: rect.top - 10
+            });
+            // Mostrar primeira ordem do grupo no tooltip
+            setMapTooltipOrder({
+              ...orders[0],
+              _locationGroup: orders // Adicionar todas as ordens do grupo
+            });
+          });
+
+          marker.addTo(window.mapInstance);
+        } else {
+          console.warn(`⚠️ Coordenadas inválidas para localização ${locationKey}:`, coordinates);
+        }
+      });
+
+      console.log(`🔄 Marcadores atualizados: ${bounds.length} pontos`);
+    };
+
     // useEffect para inicializar o mapa quando o modal abrir
     React.useEffect(() => {
       if (showUnroutedMap) {
@@ -6070,6 +6360,14 @@ function App() {
         return () => clearTimeout(timer);
       }
     }, [showUnroutedMap, coordinatesCache, unroutedOrders]);
+
+    // useEffect separado para atualizar marcadores quando a roteirização mudar
+    React.useEffect(() => {
+      if (showUnroutedMap && window.mapInstance) {
+        // Atualizar apenas os marcadores existentes sem reinicializar o mapa
+        updateMapMarkers();
+      }
+    }, [mapRoutedOrders]);
 
     // Função para imprimir o roteiro
     const printRoute = () => {
@@ -6690,6 +6988,82 @@ function App() {
                     <div id="unrouted-map" className="route-map"></div>
                   </div>
                   
+                  {/* Painel lateral direito para roteirização */}
+                  <div className="route-map-sidebar-right">
+                    <div className="route-map-sidebar-header">
+                      {(() => {
+                        const progress = getMapRouteProgress();
+                        return (
+                          <div className="route-progress-info">
+                            <div className="route-progress-bar">
+                              <div 
+                                className="route-progress-fill" 
+                                style={{ width: `${progress.percentage}%` }}
+                              ></div>
+                            </div>
+                            <div className="route-progress-text">
+                              {progress.routed} de {progress.total} ({progress.percentage}%)
+                            </div>
+                            <div className="route-progress-remaining">
+                              {progress.remaining} restantes
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    
+                    <div className="route-map-sidebar-content">
+                      {mapRoutedOrders.length === 0 ? (
+                        <div className="route-empty-state">
+                          <i className="bi bi-info-circle"></i>
+                          <p>Clique nos pontos do mapa e selecione "Incluir na rota" para começar a roteirização</p>
+                        </div>
+                      ) : (
+                        <div className="route-orders-list">
+                          {mapRoutedOrders.map((order, index) => (
+                            <div key={index} className="route-order-item">
+                              <div className="route-order-header">
+                                <div className="route-order-left">
+                                  <span className="route-order-sequence">{order.routeOrder}</span>
+                                  <span className="route-order-number">
+                                    OS {order.id || order.TB02115_CODIGO}
+                                  </span>
+                                </div>
+                                <button 
+                                  className="route-order-remove-btn"
+                                  onClick={() => removeOrderFromMapRoute(order)}
+                                  title="Remover da rota"
+                                >
+                                  <i className="bi bi-x"></i>
+                                </button>
+                              </div>
+                              <div className="route-order-details">
+                                <p><strong>Cliente:</strong> {order.cliente || order.TB01008_NOME}</p>
+                                <p><strong>Endereço:</strong> {order.endereco || order.TB02115_ENDERECO}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Botão para salvar roteirização */}
+                      {mapRoutedOrders.length > 0 && (
+                        <div className="route-save-section">
+                          <button 
+                            className="route-save-btn"
+                            onClick={() => {
+                              // Aqui você pode implementar a lógica para salvar a roteirização
+                              alert(`Roteirização salva com ${mapRoutedOrders.length} ordens!`);
+                            }}
+                          >
+                            <i className="bi bi-check-circle"></i>
+                            Salvar Roteirização
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
                   {/* Painel lateral com ordens não localizadas e ignoradas fora do Brasil */}
                   {(() => {
                     const ordersWithoutCoordinates = unroutedOrders.filter(order => {
@@ -6989,6 +7363,33 @@ function App() {
                         </span>
                       </div>
                     )}
+                    
+                    {/* Botão de ação para roteirização */}
+                    <div className="order-tooltip-actions">
+                      {isOrderInMapRoute(mapTooltipOrder) ? (
+                        <button 
+                          className="order-tooltip-action-btn remove-route-btn"
+                          onClick={() => {
+                            removeOrderFromMapRoute(mapTooltipOrder);
+                            setMapTooltipOrder(null);
+                          }}
+                        >
+                          <i className="bi bi-dash-circle"></i>
+                          Retirar da rota
+                        </button>
+                      ) : (
+                        <button 
+                          className="order-tooltip-action-btn add-route-btn"
+                          onClick={() => {
+                            addOrderToMapRoute(mapTooltipOrder);
+                            setMapTooltipOrder(null);
+                          }}
+                        >
+                          <i className="bi bi-plus-circle"></i>
+                          Incluir na rota
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -7384,145 +7785,6 @@ function App() {
       .map(([cliente, count]) => ({ cliente, count }))
       .sort((a, b) => a.cliente.localeCompare(b.cliente));
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.tipoOS, selectedColumnFilters.sla, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
-
-  const tiposOSWithCounts = React.useMemo(() => {
-    const filtered = getFilteredOrders;
-    const tipoData = {};
-    
-    // Definir todos os tipos possíveis para garantir ordem consistente
-    const allTypes = ['C', 'I', 'D', 'E', 'S', 'B', 'R', 'A'];
-    allTypes.forEach(tipo => {
-      tipoData[tipo] = 0;
-    });
-    
-    if (dataSource === 'sql_server' && filtered.length > 0) {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
-            if (selectedColumnFilters.sla.length > 0) {
-              const calcRestante = ordem.CALC_RESTANTE || 0;
-              const sla = getSLAFromCalcRestante(calcRestante);
-              if (!selectedColumnFilters.sla.includes(sla)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
-            if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            // Usar valor original do banco de dados
-            const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-            // Mapear para valor visual
-            const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-            if (tipoData.hasOwnProperty(tipoVisual)) {
-              tipoData[tipoVisual] += 1;
-            }
-          });
-        }
-      });
-    } else {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
-            if (selectedColumnFilters.sla.length > 0) {
-              const calcRestante = ordem.CALC_RESTANTE || 0;
-              const sla = getSLAFromCalcRestante(calcRestante);
-              if (!selectedColumnFilters.sla.includes(sla)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
-            if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            // Usar valor original do banco de dados
-            const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-            // Mapear para valor visual
-            const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-            if (tipoData.hasOwnProperty(tipoVisual)) {
-              tipoData[tipoVisual] += 1;
-            }
-          });
-        }
-      });
-    }
-    
-    return allTypes
-      .map(tipo => ({ tipo, count: tipoData[tipo] }))
-      .filter(item => item.count > 0); // Mostrar apenas tipos que têm ordens
-  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
   const equipamentosWithCounts = React.useMemo(() => {
     const filtered = getFilteredOrders;
