@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Drag and Drop Entre Seções dos Técnicos</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: #f1f5f9;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .test-header h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 24px;
+        }
+        
+        .test-content {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #475569;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .feature-section {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .feature-section h3 {
+            margin: 0 0 10px 0;
+            color: #16a34a;
+            font-size: 16px;
+        }
+        
+        .debug-section {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .debug-section h4 {
+            margin: 0 0 10px 0;
+            color: #334155;
+        }
+        
+        .debug-code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-implemented {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-testing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        .test-button.secondary {
+            background: #64748b;
+        }
+        
+        .test-button.secondary:hover {
+            background: #475569;
+        }
+        
+        .flow-diagram {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        
+        .flow-diagram h4 {
+            margin: 0 0 15px 0;
+            color: #1e293b;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .flow-arrow {
+            margin: 0 15px;
+            color: #64748b;
+            font-weight: bold;
+        }
+        
+        .flow-section {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .section-previsto-hoje {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .section-previsto-amanha {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .section-futura {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .section-em-servico {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .comparison-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .comparison-table td {
+            color: #6b7280;
+        }
+        
+        .comparison-table .success {
+            background: #f0fdf4;
+        }
+        
+        .comparison-table .info {
+            background: #eff6ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔄 Teste - Drag and Drop Entre Seções dos Técnicos</h1>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h2>Funcionalidades Implementadas</h2>
+                
+                <div class="feature-section">
+                    <h3>✅ 1. PREVISTO PARA HOJE → PREVISTO PARA AMANHÃ</h3>
+                    <p><strong>Status:</strong> Atualização "Para atender no próximo dia"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+                
+                <div class="feature-section">
+                    <h3>✅ 2. PREVISTO PARA AMANHÃ → PREVISTO PARA HOJE</h3>
+                    <p><strong>Status:</strong> Atualização "Encaminhado ao técnico"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+                
+                <div class="feature-section">
+                    <h3>✅ 3. PREVISTO PARA AMANHÃ → FUTURA</h3>
+                    <p><strong>Status:</strong> Atualização "Em dia ou futura"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+                
+                <div class="feature-section">
+                    <h3>✅ 4. PREVISTO PARA HOJE → FUTURA</h3>
+                    <p><strong>Status:</strong> Atualização "Em dia ou futura"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+                
+                <div class="feature-section">
+                    <h3>✅ 5. FUTURA → PREVISTO PARA HOJE</h3>
+                    <p><strong>Status:</strong> Atualização "Encaminhado ao técnico"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+                
+                <div class="feature-section">
+                    <h3>✅ 6. FUTURA → PREVISTO PARA AMANHÃ</h3>
+                    <p><strong>Status:</strong> Atualização "Para atender no próximo dia"</p>
+                    <p><strong>Configuração:</strong> Usa status configurado nas configurações de processos</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Diagrama de Fluxo</h2>
+                
+                <div class="flow-diagram">
+                    <h4>🔄 Movimentações Permitidas</h4>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-previsto-hoje">PREVISTO PARA HOJE</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-previsto-amanha">PREVISTO PARA AMANHÃ</div>
+                        <div class="flow-arrow">(Para atender no próximo dia)</div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-previsto-amanha">PREVISTO PARA AMANHÃ</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-previsto-hoje">PREVISTO PARA HOJE</div>
+                        <div class="flow-arrow">(Encaminhado ao técnico)</div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-previsto-amanha">PREVISTO PARA AMANHÃ</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-futura">FUTURA</div>
+                        <div class="flow-arrow">(Em dia ou futura)</div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-previsto-hoje">PREVISTO PARA HOJE</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-futura">FUTURA</div>
+                        <div class="flow-arrow">(Em dia ou futura)</div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-futura">FUTURA</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-previsto-hoje">PREVISTO PARA HOJE</div>
+                        <div class="flow-arrow">(Encaminhado ao técnico)</div>
+                    </div>
+                    
+                    <div class="flow-step">
+                        <div class="flow-section section-futura">FUTURA</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-section section-previsto-amanha">PREVISTO PARA AMANHÃ</div>
+                        <div class="flow-arrow">(Para atender no próximo dia)</div>
+                    </div>
+                    
+                    <div style="margin-top: 20px; padding: 10px; background: #fee2e2; border-radius: 4px; color: #991b1b;">
+                        <strong>⚠️ Restrição:</strong> Não é permitido arrastar para "EM SERVIÇO"
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Mapeamento de Status</h2>
+                
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Seção de Destino</th>
+                            <th>Status no Banco</th>
+                            <th>Configuração</th>
+                            <th>Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="success">
+                            <td><strong>PREVISTO PARA HOJE</strong></td>
+                            <td>Encaminhado ao técnico</td>
+                            <td>status_forward</td>
+                            <td>Ordens que devem ser atendidas hoje</td>
+                        </tr>
+                        <tr class="success">
+                            <td><strong>PREVISTO PARA AMANHÃ</strong></td>
+                            <td>Para atender no próximo dia</td>
+                            <td>status_tomorrow</td>
+                            <td>Ordens agendadas para amanhã</td>
+                        </tr>
+                        <tr class="success">
+                            <td><strong>FUTURA</strong></td>
+                            <td>Em dia ou futura</td>
+                            <td>status_uptodate</td>
+                            <td>Ordens em dia ou futuras</td>
+                        </tr>
+                        <tr class="info">
+                            <td><strong>EM SERVIÇO</strong></td>
+                            <td>Em serviço</td>
+                            <td>status_inservice</td>
+                            <td>Ordens em execução (não permite drag)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="test-section">
+                <h2>Implementação Técnica</h2>
+                
+                <div class="debug-section">
+                    <h4>🔧 Detecção de Drag Entre Seções</h4>
+                    <div class="debug-code">
+// Verificar se é um drop entre seções do mesmo técnico
+const fromTechnician = e.dataTransfer.getData('fromTechnician');
+const fromGroup = e.dataTransfer.getData('fromGroup');
+
+if (fromTechnician === 'true' && fromGroup && fromGroup !== groupName) {
+  // É um drop entre seções do mesmo técnico
+  handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
+} else {
+  // É um drop da coluna "Em aberto" para o técnico
+  handleDropToTechnique(technician, groupName);
+}
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Dados de Transferência</h4>
+                    <div class="debug-code">
+onDragStart={(e) => {
+  e.dataTransfer.setData('orderId', ordem.id);
+  e.dataTransfer.setData('fromTechnician', 'true');
+  e.dataTransfer.setData('fromGroup', groupName);
+  console.log(`📋 Dados: orderId=${ordem.id}, fromTechnician=true, fromGroup=${groupName}`);
+}}
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Função de Movimentação</h4>
+                    <div class="debug-code">
+const handleDropBetweenTechnicianSections = async (technicianName, fromGroup, toGroup) => {
+  // Não permitir drop no grupo "Em serviço"
+  if (toGroup === 'Em serviço') {
+    console.log('❌ Não é permitido arrastar para "Em serviço"');
+    return;
+  }
+  
+  // Fazer chamada da API para atualizar status
+  const requestPayload = {
+    orderIds: selectedOrders,
+    targetSection: toGroup,
+    technicianId: technicianId
+  };
+  
+  // Atualizar estado local após sucesso
+  // Mover ordens entre seções
+}
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Atualização do Estado Local</h4>
+                    <div class="debug-code">
+// Encontrar e mover as ordens entre as seções
+selectedOrders.forEach(orderId => {
+  // Remover da seção de origem
+  newTechnicianGroups[technicianName][fromGroup] = 
+    newTechnicianGroups[technicianName][fromGroup].filter(
+      order => order.id !== orderId
+    );
+  
+  // Adicionar à seção de destino
+  newTechnicianGroups[technicianName][toGroup].push(orderToMove);
+});
+
+setTechnicianGroups(newTechnicianGroups);
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Como Testar</h2>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 1: Movimentação Básica</h4>
+                    <ul>
+                        <li>1. Abrir frontend do PainelOS</li>
+                        <li>2. Ir para tela Board</li>
+                        <li>3. Aplicar filtros para colunas de técnicos</li>
+                        <li>4. Selecionar ordens em "PREVISTO PARA HOJE"</li>
+                        <li>5. Arrastar para "PREVISTO PARA AMANHÃ"</li>
+                        <li>6. Verificar se modal de confirmação aparece</li>
+                        <li>7. Verificar se ordens foram movidas</li>
+                    </ul>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 2: Todas as Movimentações</h4>
+                    <ul>
+                        <li>1. Testar cada uma das 6 movimentações permitidas</li>
+                        <li>2. Verificar se status correto é aplicado</li>
+                        <li>3. Verificar se modal mostra informações corretas</li>
+                        <li>4. Verificar se estado local é atualizado</li>
+                    </ul>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 3: Restrições</h4>
+                    <ul>
+                        <li>1. Tentar arrastar para "EM SERVIÇO"</li>
+                        <li>2. Verificar se operação é bloqueada</li>
+                        <li>3. Verificar logs no console</li>
+                    </ul>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 4: Múltiplas Ordens</h4>
+                    <ul>
+                        <li>1. Selecionar múltiplas ordens</li>
+                        <li>2. Arrastar entre seções</li>
+                        <li>3. Verificar se todas foram processadas</li>
+                        <li>4. Verificar modal com resultados individuais</li>
+                    </ul>
+                </div>
+                
+                <button class="test-button" onclick="window.open('http://localhost:3000', '_blank')">
+                    🌐 Abrir Frontend
+                </button>
+                
+                <button class="test-button secondary" onclick="openDevTools()">
+                    🔧 Abrir DevTools
+                </button>
+            </div>
+            
+            <div class="test-section">
+                <h2>Status dos Testes</h2>
+                
+                <div class="debug-section">
+                    <h4>🔍 Verificações Necessárias</h4>
+                    <ul>
+                        <li>
+                            <strong>Detecção de drag entre seções:</strong>
+                            <span class="status-indicator status-implemented">✅ Implementado</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação PREVISTO HOJE → AMANHÃ:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação AMANHÃ → HOJE:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação AMANHÃ → FUTURA:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação HOJE → FUTURA:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação FUTURA → HOJE:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Movimentação FUTURA → AMANHÃ:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Bloqueio EM SERVIÇO:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Modal de feedback:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Atualização do estado local:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Logs Esperados</h2>
+                
+                <div class="debug-section">
+                    <h4>📋 Logs de Drag Start</h4>
+                    <div class="debug-code">
+🔄 Iniciando drag da ordem 123456 das colunas de técnicos
+✅ Selecionando ordem 123456 para drag
+📋 Dados de transferência definidos: orderId=123456, fromTechnician=true, fromGroup=PREVISTO PARA HOJE
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>📋 Logs de Drop</h4>
+                    <div class="debug-code">
+🎯 Movendo 1 ordens do técnico "João Silva" de "PREVISTO PARA HOJE" para "PREVISTO PARA AMANHÃ"
+🔍 ID do técnico "João Silva": 123
+✅ Status atualizado no banco: Ordens atualizadas com sucesso
+🔍 Movendo ordens entre seções...
+✅ Encontrada ordem 123456 na seção PREVISTO PARA HOJE
+📊 Resultados processados: [{orderId: "123456", status: "success", ...}]
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>📋 Logs de Erro (EM SERVIÇO)</h4>
+                    <div class="debug-code">
+❌ Não é permitido arrastar para "Em serviço"
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Resultado Esperado</h2>
+                
+                <div class="debug-section">
+                    <h4>✅ Funcionalidade Completa</h4>
+                    <ul>
+                        <li><strong>Detecção:</strong> Sistema detecta drag entre seções do mesmo técnico</li>
+                        <li><strong>Movimentação:</strong> Todas as 6 movimentações funcionam corretamente</li>
+                        <li><strong>Status:</strong> Status correto é aplicado no banco de dados</li>
+                        <li><strong>Interface:</strong> Estado local é atualizado imediatamente</li>
+                        <li><strong>Feedback:</strong> Modal mostra resultados detalhados</li>
+                        <li><strong>Restrições:</strong> "EM SERVIÇO" bloqueia movimentação</li>
+                        <li><strong>Múltiplas:</strong> Suporte a múltiplas ordens selecionadas</li>
+                        <li><strong>Logs:</strong> Rastreamento completo das operações</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Próximos Passos</h2>
+                
+                <div class="debug-section">
+                    <h4>📋 Após os Testes</h4>
+                    <ul>
+                        <li>1. Testar todas as 6 movimentações permitidas</li>
+                        <li>2. Verificar se restrições funcionam</li>
+                        <li>3. Confirmar se status correto é aplicado</li>
+                        <li>4. Verificar se modal funciona corretamente</li>
+                        <li>5. Testar com múltiplas ordens</li>
+                        <li>6. Reportar resultados dos testes</li>
+                        <li>7. Se necessário, fazer ajustes adicionais</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function openDevTools() {
+            alert('Para abrir o DevTools:\n\nChrome/Edge: F12 ou Ctrl+Shift+I\nFirefox: F12 ou Ctrl+Shift+I\nSafari: Cmd+Option+I');
+        }
+        
+        // Simular logs de teste
+        console.log('🔄 Página de teste de drag and drop entre seções carregada');
+        console.log('📋 Funcionalidades implementadas:');
+        console.log('1. PREVISTO PARA HOJE → PREVISTO PARA AMANHÃ');
+        console.log('2. PREVISTO PARA AMANHÃ → PREVISTO PARA HOJE');
+        console.log('3. PREVISTO PARA AMANHÃ → FUTURA');
+        console.log('4. PREVISTO PARA HOJE → FUTURA');
+        console.log('5. FUTURA → PREVISTO PARA HOJE');
+        console.log('6. FUTURA → PREVISTO PARA AMANHÃ');
+        console.log('');
+        console.log('🧪 Para testar:');
+        console.log('1. Abra o frontend em http://localhost:3000');
+        console.log('2. Aplique filtros para colunas de técnicos');
+        console.log('3. Selecione ordens em uma seção');
+        console.log('4. Arraste para outra seção do mesmo técnico');
+        console.log('5. Verifique se modal aparece e ordens são movidas');
+        console.log('6. Teste todas as 6 movimentações permitidas');
+    </script>
+</body>
+</html> 

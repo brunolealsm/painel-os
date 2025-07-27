@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Correções do Drag and Drop</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: #f1f5f9;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .test-header h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 24px;
+        }
+        
+        .test-content {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #475569;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .test-info {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-info h3 {
+            margin: 0 0 10px 0;
+            color: #1e293b;
+            font-size: 16px;
+        }
+        
+        .test-info ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .test-info li {
+            margin-bottom: 5px;
+            color: #475569;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        .test-button.secondary {
+            background: #64748b;
+        }
+        
+        .test-button.secondary:hover {
+            background: #475569;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .fix-highlight {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .fix-highlight h4 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+        }
+        
+        .fix-highlight p {
+            margin: 0;
+            color: #92400e;
+        }
+        
+        .debug-section {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .debug-section h4 {
+            margin: 0 0 10px 0;
+            color: #334155;
+        }
+        
+        .debug-code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 Teste - Correções do Drag and Drop</h1>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h2>Problema Identificado</h2>
+                
+                <div class="fix-highlight">
+                    <h4>🚨 Problema: Ordens nas Colunas de Técnicos Não Podem Ser Selecionadas</h4>
+                    <p><strong>Sintoma:</strong> Ao clicar nas ordens de serviço nas colunas de técnicos, a tela se move mas nada é selecionado para arrastar de volta para a coluna "Em aberto".</p>
+                    <p><strong>Causa:</strong> As ordens nas colunas de técnicos não estavam sendo selecionadas corretamente no sistema de drag and drop.</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Correções Implementadas</h2>
+                
+                <div class="test-info">
+                    <h3>✅ 1. Seleção de Ordens nas Colunas de Técnicos</h3>
+                    <ul>
+                        <li>Adicionada lógica para selecionar ordens quando o drag é iniciado</li>
+                        <li>Implementada verificação se a ordem já está selecionada</li>
+                        <li>Adicionada classe CSS <code>selected</code> para feedback visual</li>
+                        <li>Logs de debug adicionados para rastrear o processo</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>✅ 2. Feedback Visual de Seleção</h3>
+                    <ul>
+                        <li>Estilos CSS adicionados para ordens selecionadas</li>
+                        <li>Borda azul à esquerda para indicar seleção</li>
+                        <li>Fundo azul claro para destacar a seleção</li>
+                        <li>Hover state diferenciado para ordens selecionadas</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>✅ 3. Logs de Debug</h3>
+                    <ul>
+                        <li>Logs adicionados no <code>onDragStart</code> das ordens</li>
+                        <li>Logs adicionados no <code>onDrop</code> da coluna "Em aberto"</li>
+                        <li>Logs adicionados na função <code>handleReturnToOpen</code></li>
+                        <li>Rastreamento completo do fluxo de drag and drop</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Código Implementado</h2>
+                
+                <div class="debug-section">
+                    <h4>🔧 Seleção de Ordens nas Colunas de Técnicos</h4>
+                    <div class="debug-code">
+// Antes:
+&lt;div 
+  className="technician-order-row"
+  onClick={() => handleOrderClick(ordem)}
+  draggable
+  onDragStart={(e) => {
+    e.dataTransfer.setData('orderId', ordem.id);
+    e.dataTransfer.setData('fromTechnician', 'true');
+  }}
+&gt;
+
+// Depois:
+&lt;div 
+  className={`technician-order-row ${selectedOrders.includes(ordem.id) ? 'selected' : ''}`}
+  onClick={() => handleOrderClick(ordem)}
+  draggable
+  onDragStart={(e) => {
+    console.log(`🔄 Iniciando drag da ordem ${ordem.id} das colunas de técnicos`);
+    if (!selectedOrders.includes(ordem.id)) {
+      console.log(`✅ Selecionando ordem ${ordem.id} para drag`);
+      setSelectedOrders([ordem.id]);
+    }
+    e.dataTransfer.setData('orderId', ordem.id);
+    e.dataTransfer.setData('fromTechnician', 'true');
+    console.log(`📋 Dados de transferência definidos: orderId=${ordem.id}, fromTechnician=true`);
+  }}
+&gt;
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 CSS para Feedback Visual</h4>
+                    <div class="debug-code">
+.technician-order-row.selected {
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+}
+
+.technician-order-row.selected:hover {
+  background: #bbdefb;
+}
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Logs de Debug no Drop</h4>
+                    <div class="debug-code">
+onDrop={(e) => {
+  e.preventDefault();
+  console.log(`🎯 Drop detectado na coluna "Em aberto"`);
+  const orderId = e.dataTransfer.getData('orderId');
+  const fromTechnician = e.dataTransfer.getData('fromTechnician');
+  console.log(`📋 Dados recebidos: orderId=${orderId}, fromTechnician=${fromTechnician}`);
+  
+  if (fromTechnician === 'true' && orderId) {
+    console.log(`✅ Chamando handleReturnToOpen para ordem ${orderId}`);
+    handleReturnToOpen(orderId);
+  } else {
+    console.log(`❌ Drop ignorado: fromTechnician=${fromTechnician}, orderId=${orderId}`);
+  }
+  setIsDragOverOpen(false);
+}}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Como Testar as Correções</h2>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 1: Seleção de Ordens</h3>
+                    <ul>
+                        <li>1. Abrir o frontend do PainelOS</li>
+                        <li>2. Ir para a tela Board</li>
+                        <li>3. Aplicar filtros para mostrar colunas de técnicos</li>
+                        <li>4. Clicar em uma ordem de serviço em uma coluna de técnico</li>
+                        <li>5. Verificar se a ordem fica destacada (borda azul à esquerda)</li>
+                        <li>6. Verificar se aparece no console: "✅ Selecionando ordem X para drag"</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 2: Drag and Drop</h3>
+                    <ul>
+                        <li>1. Com uma ordem selecionada, arrastar para a coluna "Em aberto"</li>
+                        <li>2. Verificar se aparece no console: "🔄 Iniciando drag da ordem X"</li>
+                        <li>3. Verificar se aparece no console: "🎯 Drop detectado na coluna Em aberto"</li>
+                        <li>4. Verificar se aparece no console: "✅ Chamando handleReturnToOpen"</li>
+                        <li>5. Verificar se a ordem aparece na coluna "Em aberto"</li>
+                        <li>6. Verificar se a ordem desaparece da coluna do técnico</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 3: Múltiplas Ordens</h3>
+                    <ul>
+                        <li>1. Selecionar múltiplas ordens (Ctrl+Click)</li>
+                        <li>2. Arrastar todas para "Em aberto"</li>
+                        <li>3. Verificar se todas as ordens são movidas corretamente</li>
+                    </ul>
+                </div>
+                
+                <button class="test-button" onclick="window.open('http://localhost:3000', '_blank')">
+                    🌐 Abrir Frontend
+                </button>
+                
+                <button class="test-button secondary" onclick="openDevTools()">
+                    🔧 Abrir DevTools
+                </button>
+            </div>
+            
+            <div class="test-section">
+                <h2>Status dos Testes</h2>
+                
+                <div class="test-info">
+                    <h3>🔍 Verificações Necessárias</h3>
+                    <ul>
+                        <li>
+                            <strong>Seleção visual funciona:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Drag and drop funciona:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Logs aparecem no console:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Ordens retornam para "Em aberto":</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Logs Esperados no Console</h2>
+                
+                <div class="debug-section">
+                    <h4>📋 Sequência de Logs para Drag and Drop Bem-sucedido</h4>
+                    <div class="debug-code">
+🔄 Iniciando drag da ordem 123456 das colunas de técnicos
+✅ Selecionando ordem 123456 para drag
+📋 Dados de transferência definidos: orderId=123456, fromTechnician=true
+🎯 Drop detectado na coluna "Em aberto"
+📋 Dados recebidos: orderId=123456, fromTechnician=true
+✅ Chamando handleReturnToOpen para ordem 123456
+🔄 handleReturnToOpen chamado para ordem 123456
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>❌ Logs de Erro Possíveis</h4>
+                    <div class="debug-code">
+❌ Drop ignorado: fromTechnician=undefined, orderId=123456
+❌ Drop ignorado: fromTechnician=false, orderId=123456
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Resultado Esperado</h2>
+                
+                <div class="test-info">
+                    <h3>✅ Cenário de Sucesso</h3>
+                    <ul>
+                        <li><strong>Clique na ordem:</strong> Ordem fica destacada com borda azul</li>
+                        <li><strong>Início do drag:</strong> Logs aparecem no console</li>
+                        <li><strong>Drop na coluna "Em aberto":</strong> Ordem é movida corretamente</li>
+                        <li><strong>Estado final:</strong> Ordem aparece em "Em aberto" e desaparece da coluna do técnico</li>
+                        <li><strong>Feedback visual:</strong> Seleção é removida após o drop</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function openDevTools() {
+            // Tentar abrir DevTools (funciona apenas em alguns navegadores)
+            if (window.open) {
+                window.open('', '_blank', 'width=800,height=600');
+            }
+            alert('Para abrir o DevTools:\n\nChrome/Edge: F12 ou Ctrl+Shift+I\nFirefox: F12 ou Ctrl+Shift+I\nSafari: Cmd+Option+I');
+        }
+        
+        // Verificar se os serviços estão rodando
+        async function checkServices() {
+            try {
+                const backendResponse = await fetch('http://localhost:3002/api/health', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Backend está rodando');
+            } catch (error) {
+                console.log('❌ Backend não está acessível');
+            }
+            
+            try {
+                const frontendResponse = await fetch('http://localhost:3000', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Frontend está rodando');
+            } catch (error) {
+                console.log('❌ Frontend não está acessível');
+            }
+        }
+        
+        // Verificar serviços ao carregar a página
+        checkServices();
+        
+        // Simular logs de teste
+        console.log('🧪 Página de teste do drag and drop carregada');
+        console.log('📋 Para testar:');
+        console.log('1. Abra o frontend em http://localhost:3000');
+        console.log('2. Vá para a tela Board');
+        console.log('3. Aplique filtros para mostrar colunas de técnicos');
+        console.log('4. Teste o drag and drop das ordens');
+        console.log('5. Verifique os logs no console do navegador');
+    </script>
+</body>
+</html> 

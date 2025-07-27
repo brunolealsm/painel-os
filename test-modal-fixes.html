@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Correções do Modal de Feedback</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: #f1f5f9;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .test-header h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 24px;
+        }
+        
+        .test-content {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #475569;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .problem-section {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .problem-section h3 {
+            margin: 0 0 10px 0;
+            color: #dc2626;
+            font-size: 16px;
+        }
+        
+        .solution-section {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .solution-section h3 {
+            margin: 0 0 10px 0;
+            color: #16a34a;
+            font-size: 16px;
+        }
+        
+        .debug-section {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .debug-section h4 {
+            margin: 0 0 10px 0;
+            color: #334155;
+        }
+        
+        .debug-code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-fixed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-testing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        .test-button.secondary {
+            background: #64748b;
+        }
+        
+        .test-button.secondary:hover {
+            background: #475569;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .comparison-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .comparison-table td {
+            color: #6b7280;
+        }
+        
+        .comparison-table .problem {
+            background: #fef2f2;
+        }
+        
+        .comparison-table .solution {
+            background: #f0fdf4;
+        }
+        
+        .modal-preview {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+        }
+        
+        .modal-preview h4 {
+            margin: 0 0 15px 0;
+            color: #1e293b;
+        }
+        
+        .modal-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .modal-item.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .modal-item.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .modal-order-id {
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 14px;
+        }
+        
+        .modal-cliente {
+            color: #6b7280;
+            font-size: 13px;
+            margin: 4px 0;
+        }
+        
+        .modal-tecnico {
+            color: #888;
+            font-size: 11px;
+            font-style: italic;
+            margin: 2px 0;
+        }
+        
+        .modal-status {
+            color: #10b981;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+        
+        .modal-status.error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 Teste - Correções do Modal de Feedback</h1>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h2>Problemas Identificados</h2>
+                
+                <div class="problem-section">
+                    <h3>❌ Problema 1: Campo "Técnico" em branco</h3>
+                    <p><strong>Descrição:</strong> O campo "Técnico" aparecia em branco no modal</p>
+                    <p><strong>Causa:</strong> Informação do técnico não estava sendo passada para o modal</p>
+                </div>
+                
+                <div class="problem-section">
+                    <h3>❌ Problema 2: Nome do cliente como "N/A"</h3>
+                    <p><strong>Descrição:</strong> Abaixo do número da OS aparecia "N/A" ao invés do nome do cliente</p>
+                    <p><strong>Causa:</strong> Informação do cliente não estava sendo buscada corretamente</p>
+                </div>
+                
+                <div class="problem-section">
+                    <h3>❌ Problema 3: "Movido para: """</h3>
+                    <p><strong>Descrição:</strong> Aparecia "Movido para: """ ao invés de "Movido para: Em Aberto"</p>
+                    <p><strong>Causa:</strong> Campo targetSection não estava sendo preenchido corretamente</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Soluções Implementadas</h2>
+                
+                <div class="solution-section">
+                    <h3>✅ Solução 1: Busca de Informações das Ordens</h3>
+                    <p><strong>Implementação:</strong> Criado mapeamento de informações antes do processamento</p>
+                    <ul>
+                        <li>Busca informações das ordens nos grupos de técnicos</li>
+                        <li>Mapeia cliente, técnico e seção de destino</li>
+                        <li>Usa Map para associação eficiente</li>
+                    </ul>
+                </div>
+                
+                <div class="solution-section">
+                    <h3>✅ Solução 2: Processamento Correto dos Dados</h3>
+                    <p><strong>Implementação:</strong> Corrigido o processamento dos resultados</p>
+                    <ul>
+                        <li>Inclui informações do mapeamento nos resultados</li>
+                        <li>Garante que cliente, técnico e targetSection sejam preenchidos</li>
+                        <li>Fallback para valores padrão quando necessário</li>
+                    </ul>
+                </div>
+                
+                <div class="solution-section">
+                    <h3>✅ Solução 3: Modal Atualizado</h3>
+                    <p><strong>Implementação:</strong> Corrigida a exibição no modal</p>
+                    <ul>
+                        <li>Exibe nome do técnico quando disponível</li>
+                        <li>Mostra nome do cliente corretamente</li>
+                        <li>Exibe "Movido para: Em Aberto" corretamente</li>
+                        <li>Adicionados estilos CSS para o campo do técnico</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Comparação: Antes vs Depois</h2>
+                
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Campo</th>
+                            <th class="problem">Antes (Problema)</th>
+                            <th class="solution">Depois (Solução)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Técnico</strong></td>
+                            <td class="problem">❌ Em branco</td>
+                            <td class="solution">✅ Nome do técnico</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Cliente</strong></td>
+                            <td class="problem">❌ "N/A"</td>
+                            <td class="solution">✅ Nome do cliente</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Destino</strong></td>
+                            <td class="problem">❌ "Movido para: """</td>
+                            <td class="solution">✅ "Movido para: Em Aberto"</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Busca de Dados</strong></td>
+                            <td class="problem">❌ Sem mapeamento</td>
+                            <td class="solution">✅ Mapeamento completo</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Estilos</strong></td>
+                            <td class="problem">❌ Sem estilo para técnico</td>
+                            <td class="solution">✅ Estilo específico para técnico</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="test-section">
+                <h2>Preview do Modal Corrigido</h2>
+                
+                <div class="modal-preview">
+                    <h4>Modal de Status da Movimentação</h4>
+                    
+                    <div class="modal-item success">
+                        <div class="modal-order-id">#123456</div>
+                        <div class="modal-cliente">Cliente ABC Ltda</div>
+                        <div class="modal-tecnico">Técnico: João Silva</div>
+                        <div class="modal-status">Movida para "Em Aberto"</div>
+                    </div>
+                    
+                    <div class="modal-item success">
+                        <div class="modal-order-id">#123457</div>
+                        <div class="modal-cliente">Empresa XYZ S.A.</div>
+                        <div class="modal-tecnico">Técnico: Maria Santos</div>
+                        <div class="modal-status">Movida para "Em Aberto"</div>
+                    </div>
+                    
+                    <div class="modal-item error">
+                        <div class="modal-order-id">#123458</div>
+                        <div class="modal-cliente">Cliente DEF Ltda</div>
+                        <div class="modal-tecnico">Técnico: Pedro Costa</div>
+                        <div class="modal-status error">Erro: Ordem não encontrada</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Código Implementado</h2>
+                
+                <div class="debug-section">
+                    <h4>🔧 Mapeamento de Informações</h4>
+                    <div class="debug-code">
+// Encontrar informações das ordens antes de processar resultados
+const orderInfoMap = new Map();
+
+// Buscar informações das ordens nos grupos de técnicos
+Object.keys(technicianGroups).forEach(technician => {
+  Object.keys(technicianGroups[technician]).forEach(groupName => {
+    technicianGroups[technician][groupName].forEach(order => {
+      if (orderIdsArray.includes(order.id)) {
+        orderInfoMap.set(order.id, {
+          cliente: order.cliente || order.TB01008_NOME || 'N/A',
+          tecnico: technician,
+          targetSection: 'Em Aberto'
+        });
+      }
+    });
+  });
+});
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Processamento dos Resultados</h4>
+                    <div class="debug-code">
+// Processar resultados de sucesso
+result.data.results.forEach(item => {
+  const orderInfo = orderInfoMap.get(item.orderId) || {};
+  orderResults.push({
+    orderId: item.orderId,
+    status: 'success',
+    errorMessage: null,
+    cliente: item.cliente || orderInfo.cliente || 'N/A',
+    tecnico: orderInfo.tecnico || 'N/A',
+    targetSection: orderInfo.targetSection || 'Em Aberto'
+  });
+});
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Modal Atualizado</h4>
+                    <div class="debug-code">
+&lt;div className="order-status-details"&gt;
+  &lt;div className="order-id"&gt;#{result.orderId}&lt;/div&gt;
+  &lt;div className="order-cliente"&gt;{result.cliente}&lt;/div&gt;
+  {result.tecnico && result.tecnico !== 'N/A' && (
+    &lt;div className="order-tecnico"&gt;Técnico: {result.tecnico}&lt;/div&gt;
+  )}
+  {result.status === 'success' && (
+    &lt;div className="order-status-text success"&gt;
+      Movida para "{result.targetSection || 'Em Aberto'}"
+    &lt;/div&gt;
+  )}
+&lt;/div&gt;
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 CSS Adicionado</h4>
+                    <div class="debug-code">
+.order-status-details .order-tecnico {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Como Testar as Correções</h2>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 1: Verificar Campo Técnico</h4>
+                    <ul>
+                        <li>1. Selecionar múltiplas ordens de técnicos diferentes</li>
+                        <li>2. Arrastar para "Em Aberto"</li>
+                        <li>3. Verificar se modal mostra nome do técnico</li>
+                        <li>4. Verificar se aparece "Técnico: [Nome]"</li>
+                    </ul>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 2: Verificar Nome do Cliente</h4>
+                    <ul>
+                        <li>1. Realizar drag and drop de ordens</li>
+                        <li>2. Verificar se modal mostra nome do cliente</li>
+                        <li>3. Verificar se não aparece mais "N/A"</li>
+                        <li>4. Verificar se nome está correto</li>
+                    </ul>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🧪 Teste 3: Verificar Destino</h4>
+                    <ul>
+                        <li>1. Realizar operação de retorno para "Em Aberto"</li>
+                        <li>2. Verificar se modal mostra "Movido para: Em Aberto"</li>
+                        <li>3. Verificar se não aparece mais aspas vazias</li>
+                        <li>4. Verificar se texto está correto</li>
+                    </ul>
+                </div>
+                
+                <button class="test-button" onclick="window.open('http://localhost:3000', '_blank')">
+                    🌐 Abrir Frontend
+                </button>
+                
+                <button class="test-button secondary" onclick="openDevTools()">
+                    🔧 Abrir DevTools
+                </button>
+            </div>
+            
+            <div class="test-section">
+                <h2>Status dos Testes</h2>
+                
+                <div class="debug-section">
+                    <h4>🔍 Verificações Necessárias</h4>
+                    <ul>
+                        <li>
+                            <strong>Campo técnico preenchido:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Nome do cliente correto:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Destino "Em Aberto" correto:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Estilo do campo técnico:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Modal responsivo:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                        <li>
+                            <strong>Nenhum erro no console:</strong>
+                            <span class="status-indicator status-testing">🧪 Testar</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Resultado Esperado</h2>
+                
+                <div class="debug-section">
+                    <h4>✅ Modal Corrigido</h4>
+                    <ul>
+                        <li><strong>Campo Técnico:</strong> Mostra nome do técnico de origem</li>
+                        <li><strong>Nome do Cliente:</strong> Exibe nome correto do cliente</li>
+                        <li><strong>Destino:</strong> Mostra "Movido para: Em Aberto"</li>
+                        <li><strong>Estilo:</strong> Campo técnico com estilo diferenciado</li>
+                        <li><strong>Responsividade:</strong> Modal funciona em diferentes telas</li>
+                        <li><strong>Experiência:</strong> Informações claras e completas</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Próximos Passos</h2>
+                
+                <div class="debug-section">
+                    <h4>📋 Após os Testes</h4>
+                    <ul>
+                        <li>1. Testar todas as funcionalidades do modal</li>
+                        <li>2. Verificar se os problemas foram resolvidos</li>
+                        <li>3. Confirmar se informações estão corretas</li>
+                        <li>4. Verificar se estilos estão aplicados</li>
+                        <li>5. Reportar resultados dos testes</li>
+                        <li>6. Se necessário, fazer ajustes adicionais</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function openDevTools() {
+            alert('Para abrir o DevTools:\n\nChrome/Edge: F12 ou Ctrl+Shift+I\nFirefox: F12 ou Ctrl+Shift+I\nSafari: Cmd+Option+I');
+        }
+        
+        // Simular logs de teste
+        console.log('🔧 Página de teste de correções do modal carregada');
+        console.log('📋 Problemas identificados:');
+        console.log('1. Campo "Técnico" em branco');
+        console.log('2. Nome do cliente como "N/A"');
+        console.log('3. "Movido para: """');
+        console.log('');
+        console.log('✅ Soluções implementadas:');
+        console.log('1. Mapeamento de informações das ordens');
+        console.log('2. Processamento correto dos dados');
+        console.log('3. Modal atualizado com informações corretas');
+        console.log('');
+        console.log('🧪 Para testar:');
+        console.log('1. Abra o frontend em http://localhost:3000');
+        console.log('2. Selecione múltiplas ordens de técnicos diferentes');
+        console.log('3. Arraste para "Em Aberto"');
+        console.log('4. Verifique se modal mostra informações corretas');
+        console.log('5. Verifique se não há mais "N/A" ou campos vazios');
+    </script>
+</body>
+</html> 

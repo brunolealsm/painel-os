@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Configuração "Em Aberto"</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .test-header {
+            background: #f1f5f9;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .test-header h1 {
+            margin: 0;
+            color: #1e293b;
+            font-size: 24px;
+        }
+        
+        .test-content {
+            padding: 20px;
+        }
+        
+        .test-section {
+            margin-bottom: 30px;
+        }
+        
+        .test-section h2 {
+            color: #475569;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        
+        .test-info {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .test-info h3 {
+            margin: 0 0 10px 0;
+            color: #1e293b;
+            font-size: 16px;
+        }
+        
+        .test-info ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .test-info li {
+            margin-bottom: 5px;
+            color: #475569;
+        }
+        
+        .test-button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .test-button:hover {
+            background: #2563eb;
+        }
+        
+        .test-button.secondary {
+            background: #64748b;
+        }
+        
+        .test-button.secondary:hover {
+            background: #475569;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .status-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .feature-highlight {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .feature-highlight h4 {
+            margin: 0 0 10px 0;
+            color: #92400e;
+        }
+        
+        .feature-highlight p {
+            margin: 0;
+            color: #92400e;
+        }
+        
+        .debug-section {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .debug-section h4 {
+            margin: 0 0 10px 0;
+            color: #334155;
+        }
+        
+        .debug-code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+        }
+        
+        .config-preview {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .config-preview h4 {
+            margin: 0 0 10px 0;
+            color: #1e293b;
+        }
+        
+        .config-field {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        
+        .config-label {
+            width: 150px;
+            font-weight: 500;
+            color: #475569;
+        }
+        
+        .config-value {
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <div class="test-header">
+            <h1>🔧 Teste - Configuração "Em Aberto"</h1>
+        </div>
+        
+        <div class="test-content">
+            <div class="test-section">
+                <h2>Funcionalidade Implementada</h2>
+                
+                <div class="feature-highlight">
+                    <h4>✅ Novo Campo "Em Aberto" na Configuração de Processos</h4>
+                    <p><strong>Localização:</strong> Configurações > Processos > Campo "Em Aberto"</p>
+                    <p><strong>Formato:</strong> 2 dígitos (letras e números)</p>
+                    <p><strong>Valor Padrão:</strong> "EA"</p>
+                </div>
+                
+                <div class="feature-highlight">
+                    <h4>✅ Atualização no Banco de Dados</h4>
+                    <p><strong>Quando:</strong> Ordem é arrastada das colunas de técnicos para "Em Aberto"</p>
+                    <p><strong>Ação:</strong> Atualiza status na TB02115 e insere histórico na TB02130</p>
+                    <p><strong>Resultado:</strong> Ordem retorna para coluna "Em Aberto"</p>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Configuração Atual</h2>
+                
+                <div class="config-preview">
+                    <h4>📋 Campos de Configuração de Processos</h4>
+                    
+                    <div class="config-field">
+                        <span class="config-label">Em serviço:</span>
+                        <span class="config-value">ES</span>
+                    </div>
+                    
+                    <div class="config-field">
+                        <span class="config-label">Encaminhado ao técnico:</span>
+                        <span class="config-value">PT</span>
+                    </div>
+                    
+                    <div class="config-field">
+                        <span class="config-label">Para atender no próximo dia:</span>
+                        <span class="config-value">PA</span>
+                    </div>
+                    
+                    <div class="config-field">
+                        <span class="config-label">Em dia ou futura:</span>
+                        <span class="config-value">FT</span>
+                    </div>
+                    
+                    <div class="config-field">
+                        <span class="config-label">Em Aberto:</span>
+                        <span class="config-value">EA</span>
+                        <span class="status-indicator status-success">NOVO</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Como Testar</h2>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 1: Configuração</h3>
+                    <ul>
+                        <li>1. Abrir o frontend do PainelOS</li>
+                        <li>2. Clicar em ⚙️ (Configurações)</li>
+                        <li>3. Ir para aba "Processos"</li>
+                        <li>4. Verificar se o campo "Em Aberto" está presente</li>
+                        <li>5. Configurar com valor "EA" (ou outro de 2 dígitos)</li>
+                        <li>6. Clicar em "Salvar dados"</li>
+                        <li>7. Verificar se a configuração foi salva</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 2: Drag and Drop</h3>
+                    <ul>
+                        <li>1. Ir para tela Board</li>
+                        <li>2. Aplicar filtros para mostrar colunas de técnicos</li>
+                        <li>3. Verificar se há ordens nas colunas de técnicos</li>
+                        <li>4. Clicar em uma ordem para selecioná-la</li>
+                        <li>5. Arrastar a ordem para a coluna "Em aberto"</li>
+                        <li>6. Verificar se a ordem aparece em "Em aberto"</li>
+                        <li>7. Verificar se a ordem desaparece da coluna do técnico</li>
+                    </ul>
+                </div>
+                
+                <div class="test-info">
+                    <h3>📋 Teste 3: Logs e Debug</h3>
+                    <ul>
+                        <li>1. Abrir DevTools (F12)</li>
+                        <li>2. Ir para aba Console</li>
+                        <li>3. Realizar drag and drop</li>
+                        <li>4. Verificar logs de sucesso/erro</li>
+                        <li>5. Verificar se não há erros no console</li>
+                    </ul>
+                </div>
+                
+                <button class="test-button" onclick="window.open('http://localhost:3000', '_blank')">
+                    🌐 Abrir Frontend
+                </button>
+                
+                <button class="test-button secondary" onclick="openDevTools()">
+                    🔧 Abrir DevTools
+                </button>
+                
+                <button class="test-button secondary" onclick="testConfigAPI()">
+                    🧪 Testar API
+                </button>
+            </div>
+            
+            <div class="test-section">
+                <h2>Logs Esperados</h2>
+                
+                <div class="debug-section">
+                    <h4>📋 Configuração Salva</h4>
+                    <div class="debug-code">
+💾 Salvando configurações de processo...
+✅ Configurações de processo salvas com sucesso!
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>📋 Drag and Drop Bem-sucedido</h4>
+                    <div class="debug-code">
+🔄 handleReturnToOpen chamado para ordem 123456
+🎯 Atualizando ordem 123456 para status "Em Aberto"
+✅ Status atualizado no banco: Ordens atualizadas com sucesso
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>❌ Possíveis Erros</h4>
+                    <div class="debug-code">
+❌ Código de status não configurado para seção "Em Aberto"
+❌ Erro na requisição de retorno para "Em Aberto"
+❌ Erro ao atualizar status no banco
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Status dos Testes</h2>
+                
+                <div class="test-info">
+                    <h3>🔍 Verificações Necessárias</h3>
+                    <ul>
+                        <li>
+                            <strong>Campo "Em Aberto" aparece na configuração:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Configuração pode ser salva:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Drag and drop funciona:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Ordem aparece em "Em Aberto":</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Ordem desaparece da coluna do técnico:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                        <li>
+                            <strong>Logs aparecem no console:</strong>
+                            <span class="status-indicator status-warning">⚠️ Testar</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Arquivos Modificados</h2>
+                
+                <div class="debug-section">
+                    <h4>🔧 Frontend (painel-os/src/App.js)</h4>
+                    <div class="debug-code">
+- ProcessConfig: Adicionado campo status_open
+- handleReturnToOpen: Modificado para fazer chamada à API
+- Formulário: Novo campo "Em Aberto" na configuração
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Backend (backend/server.js)</h4>
+                    <div class="debug-code">
+- GET /api/config/process: Incluído campo status_open
+- POST /api/config/process: Suporte ao novo campo
+- POST /api/orders/update-status: Suporte ao status "Em Aberto"
+- Configurações padrão: Adicionado status_open: 'EA'
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h4>🔧 Banco de Dados</h4>
+                    <div class="debug-code">
+- Tabela LCMY_SYS_CONFIG: Nova coluna status_open VARCHAR(2)
+- Script SQL: backend/add-status-open-column.sql
+                    </div>
+                </div>
+            </div>
+            
+            <div class="test-section">
+                <h2>Resultado Esperado</h2>
+                
+                <div class="test-info">
+                    <h3>✅ Cenário de Sucesso</h3>
+                    <ul>
+                        <li><strong>Configuração:</strong> Campo "Em Aberto" aparece e pode ser configurado</li>
+                        <li><strong>Drag and Drop:</strong> Ordens podem ser arrastadas de técnicos para "Em Aberto"</li>
+                        <li><strong>Banco de Dados:</strong> Status é atualizado corretamente</li>
+                        <li><strong>Interface:</strong> Ordem aparece em "Em Aberto" e desaparece do técnico</li>
+                        <li><strong>Logs:</strong> Mensagens de sucesso aparecem no console</li>
+                        <li><strong>Histórico:</strong> Registro é inserido na TB02130</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function openDevTools() {
+            alert('Para abrir o DevTools:\n\nChrome/Edge: F12 ou Ctrl+Shift+I\nFirefox: F12 ou Ctrl+Shift+I\nSafari: Cmd+Option+I');
+        }
+        
+        async function testConfigAPI() {
+            try {
+                console.log('🧪 Testando API de configuração...');
+                
+                // Testar GET /api/config/process
+                const response = await fetch('http://localhost:3002/api/config/process', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                console.log('📋 Resultado da API:', result);
+                
+                if (result.success) {
+                    if (result.data && result.data.status_open) {
+                        console.log('✅ Campo status_open encontrado:', result.data.status_open);
+                    } else {
+                        console.log('⚠️ Campo status_open não encontrado na resposta');
+                    }
+                } else {
+                    console.log('❌ Erro na API:', result.message);
+                }
+                
+            } catch (error) {
+                console.log('❌ Erro ao testar API:', error.message);
+            }
+        }
+        
+        // Verificar se os serviços estão rodando
+        async function checkServices() {
+            try {
+                const backendResponse = await fetch('http://localhost:3002/api/health', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Backend está rodando');
+            } catch (error) {
+                console.log('❌ Backend não está acessível');
+            }
+            
+            try {
+                const frontendResponse = await fetch('http://localhost:3000', { 
+                    method: 'GET',
+                    mode: 'no-cors'
+                });
+                console.log('✅ Frontend está rodando');
+            } catch (error) {
+                console.log('❌ Frontend não está acessível');
+            }
+        }
+        
+        // Verificar serviços ao carregar a página
+        checkServices();
+        
+        // Simular logs de teste
+        console.log('🧪 Página de teste da configuração "Em Aberto" carregada');
+        console.log('📋 Para testar:');
+        console.log('1. Abra o frontend em http://localhost:3000');
+        console.log('2. Vá para Configurações > Processos');
+        console.log('3. Configure o campo "Em Aberto"');
+        console.log('4. Teste o drag and drop das ordens');
+        console.log('5. Verifique os logs no console do navegador');
+    </script>
+</body>
+</html> 

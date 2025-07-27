@@ -242,7 +242,8 @@ const ProcessConfig = () => {
     status_inservice: '',
     status_forward: '',
     status_tomorrow: '',
-    status_uptodate: ''
+    status_uptodate: '',
+    status_open: ''
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -287,7 +288,8 @@ const ProcessConfig = () => {
           status_inservice: result.data.status_inservice || '',
           status_forward: result.data.status_forward || '',
           status_tomorrow: result.data.status_tomorrow || '',
-          status_uptodate: result.data.status_uptodate || ''
+          status_uptodate: result.data.status_uptodate || '',
+          status_open: result.data.status_open || ''
         });
       } else {
         console.log('ℹ️ Nenhuma configuração encontrada, usando valores padrão');
@@ -408,6 +410,20 @@ const ProcessConfig = () => {
               value={processConfig.status_uptodate}
               onChange={(e) => handleInputChange('status_uptodate', e.target.value)}
               placeholder="Ex: ED"
+              className="form-input process-input"
+              maxLength="2"
+            />
+            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="status_open">Em Aberto</label>
+            <input
+              type="text"
+              id="status_open"
+              value={processConfig.status_open}
+              onChange={(e) => handleInputChange('status_open', e.target.value)}
+              placeholder="Ex: EA"
               className="form-input process-input"
               maxLength="2"
             />
@@ -641,8 +657,8 @@ const OrderStatusModal = ({ isOpen, results, summary, onClose }) => {
           </div>
           {summary && (
             <div className="summary-info">
-              <strong>Sessão:</strong> {summary.targetSection}<br/>
-              <strong>Técnico:</strong> {summary.technicianName}
+              <strong>Seção:</strong> {summary.targetSection}<br/>
+              <strong>Técnico:</strong> {summary.technicianName || 'N/A'}
             </div>
           )}
         </div>
@@ -657,10 +673,13 @@ const OrderStatusModal = ({ isOpen, results, summary, onClose }) => {
                   </div>
                   <div className="order-status-details">
                     <div className="order-id">#{result.orderId}</div>
-                    {result.cliente && <div className="order-cliente">{result.cliente}</div>}
+                    <div className="order-cliente">{result.cliente}</div>
+                    {result.tecnico && result.tecnico !== 'N/A' && (
+                      <div className="order-tecnico">Técnico: {result.tecnico}</div>
+                    )}
                     {result.status === 'success' && (
                       <div className="order-status-text success">
-                        Movida para "{result.targetSection}"
+                        Movida para "{result.targetSection || 'Em Aberto'}"
                       </div>
                     )}
                     {result.status === 'error' && (
@@ -3020,6 +3039,226 @@ function App() {
     }
   }, [availableOrdersState, initialFilterApplied]);
 
+  const handleDropBetweenTechnicianSections = async (technicianName, fromGroup, toGroup) => {
+    // Não permitir drop no grupo "Em serviço"
+    if (toGroup === 'Em serviço') {
+      console.log('❌ Não é permitido arrastar para "Em serviço"');
+      return;
+    }
+    
+    // Se não há ordens selecionadas, não fazer nada
+    if (selectedOrders.length === 0) {
+      console.log('⚠️ Nenhuma ordem selecionada para arrastar');
+      return;
+    }
+    
+    try {
+      console.log(`🎯 Movendo ${selectedOrders.length} ordens do técnico "${technicianName}" de "${fromGroup}" para "${toGroup}"`);
+      
+      // Obter ID do técnico
+      const technicianId = getTechnicianIdByName(technicianName);
+      console.log(`🔍 ID do técnico "${technicianName}": ${technicianId}`);
+      
+      // Objeto que será enviado para o backend
+      const requestPayload = {
+        orderIds: selectedOrders,
+        targetSection: toGroup,
+        technicianId: technicianId
+      };
+      
+      // Fazer chamada da API para atualizar status no banco de dados
+      const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      const result = await response.json();
+      
+      // Preparar dados para o modal
+      const orderResults = [];
+      
+      // Buscar informações das ordens nos grupos de técnicos
+      const orderInfoMap = new Map();
+      Object.keys(technicianGroups).forEach(tech => {
+        Object.keys(technicianGroups[tech]).forEach(group => {
+          technicianGroups[tech][group].forEach(order => {
+            if (selectedOrders.includes(order.id)) {
+              orderInfoMap.set(order.id, {
+                cliente: order.cliente || order.TB01008_NOME || 'N/A',
+                tecnico: tech,
+                targetSection: toGroup
+              });
+            }
+          });
+        });
+      });
+      
+      if (!result.success) {
+        console.error('❌ Erro ao atualizar status no banco:', result.message);
+        
+        // Criar resultados de erro para o modal
+        selectedOrders.forEach(orderId => {
+          const orderInfo = orderInfoMap.get(orderId) || {};
+          orderResults.push({
+            orderId: orderId,
+            status: 'error',
+            errorMessage: result.message,
+            cliente: orderInfo.cliente || 'N/A',
+            tecnico: orderInfo.tecnico || 'N/A',
+            targetSection: orderInfo.targetSection || toGroup
+          });
+        });
+        
+        // Mostrar modal com erro
+        setOrderStatusResults(orderResults);
+        setOrderStatusSummary({
+          targetSection: toGroup,
+          technicianName: technicianName
+        });
+        setShowOrderStatusModal(true);
+        return;
+      }
+      
+      console.log(`✅ Status atualizado no banco: ${result.message}`);
+      console.log('📊 Detalhes:', result.data);
+      
+      // Processar resultados do backend
+      if (result.data && result.data.results && Array.isArray(result.data.results)) {
+        result.data.results.forEach(item => {
+          const orderInfo = orderInfoMap.get(item.orderId) || {};
+          orderResults.push({
+            orderId: item.orderId,
+            status: 'success',
+            errorMessage: null,
+            cliente: item.cliente || orderInfo.cliente || 'N/A',
+            tecnico: orderInfo.tecnico || 'N/A',
+            targetSection: orderInfo.targetSection || toGroup
+          });
+        });
+      }
+      
+      // Processar erros do backend
+      if (result.data && result.data.errors && Array.isArray(result.data.errors)) {
+        result.data.errors.forEach(item => {
+          const orderInfo = orderInfoMap.get(item.orderId) || {};
+          orderResults.push({
+            orderId: item.orderId,
+            status: 'error',
+            errorMessage: item.error,
+            cliente: orderInfo.cliente || 'N/A',
+            tecnico: orderInfo.tecnico || 'N/A',
+            targetSection: orderInfo.targetSection || toGroup
+          });
+        });
+      }
+      
+      // Se não há resultados estruturados, criar baseado no sucesso geral
+      if (orderResults.length === 0) {
+        if (result.success) {
+          selectedOrders.forEach(orderId => {
+            const orderInfo = orderInfoMap.get(orderId) || {};
+            orderResults.push({
+              orderId: orderId,
+              status: 'success',
+              errorMessage: null,
+              cliente: orderInfo.cliente || 'N/A',
+              tecnico: orderInfo.tecnico || 'N/A',
+              targetSection: orderInfo.targetSection || toGroup
+            });
+          });
+        } else {
+          selectedOrders.forEach(orderId => {
+            const orderInfo = orderInfoMap.get(orderId) || {};
+            orderResults.push({
+              orderId: orderId,
+              status: 'error',
+              errorMessage: result.message,
+              cliente: orderInfo.cliente || 'N/A',
+              tecnico: orderInfo.tecnico || 'N/A',
+              targetSection: orderInfo.targetSection || toGroup
+            });
+          });
+        }
+      }
+      
+      console.log('📊 Resultados processados:', orderResults);
+      console.log('📊 Total de resultados:', orderResults.length);
+      
+      // Mostrar modal com resultados
+      setOrderStatusResults(orderResults);
+      setOrderStatusSummary({
+        targetSection: toGroup,
+        technicianName: technicianName
+      });
+      setShowOrderStatusModal(true);
+      
+      // Se a atualização no banco foi bem-sucedida, atualizar o estado local
+      const newTechnicianGroups = { ...technicianGroups };
+      
+      // Encontrar e mover as ordens entre as seções
+      console.log('🔍 Movendo ordens entre seções...');
+      console.log('🔍 Ordens a mover:', selectedOrders);
+      console.log('🔍 De:', fromGroup, 'Para:', toGroup);
+      
+      selectedOrders.forEach(orderId => {
+        console.log(`🔍 Procurando ordem ${orderId}...`);
+        let found = false;
+        
+        // Remover da seção de origem
+        if (newTechnicianGroups[technicianName] && newTechnicianGroups[technicianName][fromGroup]) {
+          const orderIndex = newTechnicianGroups[technicianName][fromGroup].findIndex(order => order.id === orderId);
+          if (orderIndex !== -1) {
+            console.log(`✅ Encontrada ordem ${orderId} na seção ${fromGroup}`);
+            const orderToMove = newTechnicianGroups[technicianName][fromGroup][orderIndex];
+            
+            // Remover da seção de origem
+            newTechnicianGroups[technicianName][fromGroup] = newTechnicianGroups[technicianName][fromGroup].filter(
+              order => order.id !== orderId
+            );
+            
+            // Adicionar à seção de destino
+            if (!newTechnicianGroups[technicianName][toGroup]) {
+              newTechnicianGroups[technicianName][toGroup] = [];
+            }
+            newTechnicianGroups[technicianName][toGroup].push(orderToMove);
+            
+            found = true;
+          }
+        }
+        
+        if (!found) {
+          console.log(`⚠️ Ordem ${orderId} não encontrada na seção ${fromGroup}`);
+        }
+      });
+      
+      setTechnicianGroups(newTechnicianGroups);
+      setSelectedOrders([]); // Clear selection after success
+      
+    } catch (error) {
+      console.error('❌ Erro na requisição de movimentação entre seções:', error);
+      
+      // Criar resultados de erro para o modal
+      const errorResults = selectedOrders.map(orderId => ({
+        orderId,
+        status: 'error',
+        errorMessage: error.message,
+        cliente: 'N/A',
+        tecnico: technicianName,
+        targetSection: toGroup
+      }));
+      
+      setOrderStatusResults(errorResults);
+      setOrderStatusSummary({
+        targetSection: toGroup,
+        technicianName: technicianName
+      });
+      setShowOrderStatusModal(true);
+    }
+  };
+
   const handleDropToTechnique = async (technicianName, groupName = 'Previsto para hoje') => {
     // Não permitir drop no grupo "Em serviço"
     if (groupName === 'Em serviço') {
@@ -3210,114 +3449,311 @@ function App() {
   };
 
   // Nova função para retornar ordens para "Em aberto"
-  const handleReturnToOpen = (orderId) => {
-    const newTechnicianGroups = { ...technicianGroups };
-    let orderToReturn = null;
+  const handleReturnToOpen = async (orderIds) => {
+    // Garantir que orderIds seja sempre um array
+    const orderIdsArray = Array.isArray(orderIds) ? orderIds : [orderIds];
+    console.log(`🔄 handleReturnToOpen chamado para ${orderIdsArray.length} ordens:`, orderIdsArray);
     
-    // Encontrar e remover a ordem dos grupos de técnicos
-    Object.keys(newTechnicianGroups).forEach(technician => {
-      Object.keys(newTechnicianGroups[technician]).forEach(groupName => {
-        const orderIndex = newTechnicianGroups[technician][groupName].findIndex(order => order.id === orderId);
-        if (orderIndex !== -1) {
-          orderToReturn = newTechnicianGroups[technician][groupName][orderIndex];
-          newTechnicianGroups[technician][groupName] = newTechnicianGroups[technician][groupName].filter(
-            order => order.id !== orderId
-          );
-        }
-      });
-    });
-    
-    // Se encontrou a ordem, adicionar de volta aos dados disponíveis
-    if (orderToReturn) {
-      const newAvailableOrders = [...availableOrdersState];
-      let groupFound = false;
+    try {
+      console.log(`🎯 Atualizando ${orderIdsArray.length} ordens para status "Em Aberto"`);
       
-      // Procurar grupo existente da cidade para adicionar a ordem
-      for (let item of newAvailableOrders) {
-        if (item.cidade === orderToReturn.cidade) {
-          // Restaurar ordem com todos os dados originais
-          const restoredOrder = {
-            id: orderToReturn.id,
-            cliente: orderToReturn.cliente,
-            equipamento: orderToReturn.equipamento,
-            sla: orderToReturn.sla,
-            tipo: orderToReturn.tipo,
-            atrasada: orderToReturn.sla === 'vencido',
-            pedidoVinculado: orderToReturn.pedidoVinculado,
-            // Campos necessários para os modais e sidebars
-            numeroSerie: orderToReturn.numeroSerie,
-            serie: orderToReturn.serie,
-            patrimonio: orderToReturn.patrimonio,
-            endereco: orderToReturn.endereco,
-            dataAbertura: orderToReturn.dataAbertura,
-            tecnico: orderToReturn.tecnico,
-            coordenador: orderToReturn.coordenador,
-            area: orderToReturn.area,
-            bairro: orderToReturn.bairro,
-            estado: orderToReturn.estado,
-            contrato: orderToReturn.contrato,
-            // Preservar todos os campos originais
-            TB02115_CODIGO: orderToReturn.TB02115_CODIGO,
-            TB01008_NOME: orderToReturn.TB01008_NOME,
-            TB01010_NOME: orderToReturn.TB01010_NOME,
-            TB02115_PREVENTIVA: orderToReturn.TB02115_PREVENTIVA,
-            TB02115_BAIRRO: orderToReturn.TB02115_BAIRRO,
-            CALC_RESTANTE: orderToReturn.CALC_RESTANTE,
-            TB01047_NOME: orderToReturn.TB01047_NOME,
-            TB01018_NOME: orderToReturn.TB01018_NOME,
-            TB01073_NOME: orderToReturn.TB01073_NOME
-          };
+      // Objeto que será enviado para o backend
+      const requestPayload = {
+        orderIds: orderIdsArray,
+        targetSection: 'Em Aberto',
+        technicianId: null // Não há técnico para "Em Aberto"
+      };
+      
+      // Fazer chamada da API para atualizar status no banco de dados
+      const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload)
+      });
+      
+      const result = await response.json();
+      
+      // Preparar dados para o modal
+      const orderResults = [];
+      
+      if (!result.success) {
+        console.error('❌ Erro ao atualizar status no banco:', result.message);
+        
+        // Criar resultados de erro para o modal
+        orderIdsArray.forEach(orderId => {
+          let orderData = { orderId, status: 'error', errorMessage: result.message };
           
-          item.ordens.push(restoredOrder);
-          groupFound = true;
-          break;
-        }
+          // Buscar dados da ordem para o modal
+          availableOrdersState.forEach(cityGroup => {
+            cityGroup.ordens.forEach(ordem => {
+              if ((ordem.id || ordem.TB02115_CODIGO) === orderId) {
+                orderData.cliente = ordem.cliente || ordem.TB01008_NOME;
+              }
+            });
+          });
+          
+          orderResults.push(orderData);
+        });
+        
+        // Mostrar modal com erro
+        setOrderStatusResults(orderResults);
+        setOrderStatusSummary({
+          targetSection: 'Em Aberto',
+          technicianName: null
+        });
+        setShowOrderStatusModal(true);
+        return;
       }
       
-      // Se não encontrou grupo existente da cidade, criar novo
-      if (!groupFound) {
-        const restoredOrder = {
-          id: orderToReturn.id,
-          cliente: orderToReturn.cliente,
-          equipamento: orderToReturn.equipamento,
-          sla: orderToReturn.sla,
-          tipo: orderToReturn.tipo,
-          atrasada: orderToReturn.sla === 'vencido',
-          pedidoVinculado: orderToReturn.pedidoVinculado,
-          // Campos necessários para os modais e sidebars
-          numeroSerie: orderToReturn.numeroSerie,
-          serie: orderToReturn.serie,
-          patrimonio: orderToReturn.patrimonio,
-          endereco: orderToReturn.endereco,
-          dataAbertura: orderToReturn.dataAbertura,
-          tecnico: orderToReturn.tecnico,
-          coordenador: orderToReturn.coordenador,
-          area: orderToReturn.area,
-          bairro: orderToReturn.bairro,
-          estado: orderToReturn.estado,
-          contrato: orderToReturn.contrato,
-          // Preservar todos os campos originais
-          TB02115_CODIGO: orderToReturn.TB02115_CODIGO,
-          TB01008_NOME: orderToReturn.TB01008_NOME,
-          TB01010_NOME: orderToReturn.TB01010_NOME,
-          TB02115_PREVENTIVA: orderToReturn.TB02115_PREVENTIVA,
-          TB02115_BAIRRO: orderToReturn.TB02115_BAIRRO,
-          CALC_RESTANTE: orderToReturn.CALC_RESTANTE,
-          TB01047_NOME: orderToReturn.TB01047_NOME,
-          TB01018_NOME: orderToReturn.TB01018_NOME,
-          TB01073_NOME: orderToReturn.TB01073_NOME
-        };
-        
-        newAvailableOrders.push({
-          cidade: orderToReturn.cidade,
-          ordens: [restoredOrder]
+      console.log(`✅ Status atualizado no banco: ${result.message}`);
+      console.log('📊 Detalhes:', result.data);
+      
+      // Encontrar informações das ordens antes de processar resultados
+      const orderInfoMap = new Map();
+      
+      // Buscar informações das ordens nos grupos de técnicos
+      Object.keys(technicianGroups).forEach(technician => {
+        Object.keys(technicianGroups[technician]).forEach(groupName => {
+          technicianGroups[technician][groupName].forEach(order => {
+            if (orderIdsArray.includes(order.id)) {
+              orderInfoMap.set(order.id, {
+                cliente: order.cliente || order.TB01008_NOME || 'N/A',
+                tecnico: technician,
+                targetSection: 'Em Aberto'
+              });
+            }
+          });
+        });
+      });
+      
+      // Processar resultados do backend
+      if (result.data && result.data.results && Array.isArray(result.data.results)) {
+        // Processar resultados de sucesso
+        result.data.results.forEach(item => {
+          const orderInfo = orderInfoMap.get(item.orderId) || {};
+          orderResults.push({
+            orderId: item.orderId,
+            status: 'success',
+            errorMessage: null,
+            cliente: item.cliente || orderInfo.cliente || 'N/A',
+            tecnico: orderInfo.tecnico || 'N/A',
+            targetSection: orderInfo.targetSection || 'Em Aberto'
+          });
         });
       }
       
-      setAvailableOrdersState(newAvailableOrders);
+      // Processar erros do backend
+      if (result.data && result.data.errors && Array.isArray(result.data.errors)) {
+        result.data.errors.forEach(item => {
+          const orderInfo = orderInfoMap.get(item.orderId) || {};
+          orderResults.push({
+            orderId: item.orderId,
+            status: 'error',
+            errorMessage: item.error,
+            cliente: orderInfo.cliente || 'N/A',
+            tecnico: orderInfo.tecnico || 'N/A',
+            targetSection: orderInfo.targetSection || 'Em Aberto'
+          });
+        });
+      }
+      
+      // Se não há resultados estruturados, criar baseado no sucesso geral
+      if (orderResults.length === 0) {
+        if (result.success) {
+          // Se foi sucesso geral, criar resultados para todas as ordens
+          orderIdsArray.forEach(orderId => {
+            const orderInfo = orderInfoMap.get(orderId) || {};
+            orderResults.push({
+              orderId: orderId,
+              status: 'success',
+              errorMessage: null,
+              cliente: orderInfo.cliente || 'N/A',
+              tecnico: orderInfo.tecnico || 'N/A',
+              targetSection: orderInfo.targetSection || 'Em Aberto'
+            });
+          });
+        } else {
+          // Se foi erro geral, criar resultados de erro para todas as ordens
+          orderIdsArray.forEach(orderId => {
+            const orderInfo = orderInfoMap.get(orderId) || {};
+            orderResults.push({
+              orderId: orderId,
+              status: 'error',
+              errorMessage: result.message,
+              cliente: orderInfo.cliente || 'N/A',
+              tecnico: orderInfo.tecnico || 'N/A',
+              targetSection: orderInfo.targetSection || 'Em Aberto'
+            });
+          });
+        }
+      }
+      
+      console.log('📊 Resultados processados:', orderResults);
+      console.log('📊 Total de resultados:', orderResults.length);
+      
+      // Mostrar modal com resultados
+      setOrderStatusResults(orderResults);
+      setOrderStatusSummary({
+        targetSection: 'Em Aberto',
+        technicianName: null
+      });
+      setShowOrderStatusModal(true);
+      
+      // Se a atualização no banco foi bem-sucedida, atualizar o estado local
+      const newTechnicianGroups = { ...technicianGroups };
+      const ordersToReturn = [];
+      
+      // Encontrar e remover as ordens dos grupos de técnicos
+      console.log('🔍 Procurando ordens nos grupos de técnicos...');
+      console.log('🔍 Ordens a procurar:', orderIdsArray);
+      console.log('🔍 Grupos de técnicos disponíveis:', Object.keys(newTechnicianGroups));
+      
+      orderIdsArray.forEach(orderId => {
+        console.log(`🔍 Procurando ordem ${orderId}...`);
+        let found = false;
+        
+        Object.keys(newTechnicianGroups).forEach(technician => {
+          Object.keys(newTechnicianGroups[technician]).forEach(groupName => {
+            const orderIndex = newTechnicianGroups[technician][groupName].findIndex(order => order.id === orderId);
+            if (orderIndex !== -1) {
+              console.log(`✅ Encontrada ordem ${orderId} no técnico ${technician}, grupo ${groupName}`);
+              const orderToReturn = newTechnicianGroups[technician][groupName][orderIndex];
+              ordersToReturn.push(orderToReturn);
+              newTechnicianGroups[technician][groupName] = newTechnicianGroups[technician][groupName].filter(
+                order => order.id !== orderId
+              );
+              found = true;
+            }
+          });
+        });
+        
+        if (!found) {
+          console.log(`⚠️ Ordem ${orderId} não encontrada nos grupos de técnicos`);
+        }
+      });
+      
+      console.log('📊 Ordens encontradas para retorno:', ordersToReturn.length);
+      console.log('📊 IDs das ordens encontradas:', ordersToReturn.map(o => o.id));
+      
+      // Se encontrou ordens, adicionar de volta aos dados disponíveis
+      if (ordersToReturn.length > 0) {
+        const newAvailableOrders = [...availableOrdersState];
+        
+        // Processar cada ordem retornada
+        ordersToReturn.forEach(orderToReturn => {
+          let groupFound = false;
+          
+          // Procurar grupo existente da cidade para adicionar a ordem
+          for (let item of newAvailableOrders) {
+            if (item.cidade === orderToReturn.cidade) {
+              // Restaurar ordem com todos os dados originais
+              const restoredOrder = {
+                id: orderToReturn.id,
+                cliente: orderToReturn.cliente,
+                equipamento: orderToReturn.equipamento,
+                sla: orderToReturn.sla,
+                tipo: orderToReturn.tipo,
+                atrasada: orderToReturn.sla === 'vencido',
+                pedidoVinculado: orderToReturn.pedidoVinculado,
+                // Campos necessários para os modais e sidebars
+                numeroSerie: orderToReturn.numeroSerie,
+                serie: orderToReturn.serie,
+                patrimonio: orderToReturn.patrimonio,
+                endereco: orderToReturn.endereco,
+                dataAbertura: orderToReturn.dataAbertura,
+                tecnico: orderToReturn.tecnico,
+                coordenador: orderToReturn.coordenador,
+                area: orderToReturn.area,
+                bairro: orderToReturn.bairro,
+                estado: orderToReturn.estado,
+                contrato: orderToReturn.contrato,
+                // Preservar todos os campos originais
+                TB02115_CODIGO: orderToReturn.TB02115_CODIGO,
+                TB01008_NOME: orderToReturn.TB01008_NOME,
+                TB01010_NOME: orderToReturn.TB01010_NOME,
+                TB02115_PREVENTIVA: orderToReturn.TB02115_PREVENTIVA,
+                TB02115_BAIRRO: orderToReturn.TB02115_BAIRRO,
+                CALC_RESTANTE: orderToReturn.CALC_RESTANTE,
+                TB01047_NOME: orderToReturn.TB01047_NOME,
+                TB01018_NOME: orderToReturn.TB01018_NOME,
+                TB01073_NOME: orderToReturn.TB01073_NOME
+              };
+              
+              item.ordens.push(restoredOrder);
+              groupFound = true;
+              break;
+            }
+          }
+          
+          // Se não encontrou grupo existente da cidade, criar novo
+          if (!groupFound) {
+            const restoredOrder = {
+              id: orderToReturn.id,
+              cliente: orderToReturn.cliente,
+              equipamento: orderToReturn.equipamento,
+              sla: orderToReturn.sla,
+              tipo: orderToReturn.tipo,
+              atrasada: orderToReturn.sla === 'vencido',
+              pedidoVinculado: orderToReturn.pedidoVinculado,
+              // Campos necessários para os modais e sidebars
+              numeroSerie: orderToReturn.numeroSerie,
+              serie: orderToReturn.serie,
+              patrimonio: orderToReturn.patrimonio,
+              endereco: orderToReturn.endereco,
+              dataAbertura: orderToReturn.dataAbertura,
+              tecnico: orderToReturn.tecnico,
+              coordenador: orderToReturn.coordenador,
+              area: orderToReturn.area,
+              bairro: orderToReturn.bairro,
+              estado: orderToReturn.estado,
+              contrato: orderToReturn.contrato,
+              // Preservar todos os campos originais
+              TB02115_CODIGO: orderToReturn.TB02115_CODIGO,
+              TB01008_NOME: orderToReturn.TB01008_NOME,
+              TB01010_NOME: orderToReturn.TB01010_NOME,
+              TB02115_PREVENTIVA: orderToReturn.TB02115_PREVENTIVA,
+              TB02115_BAIRRO: orderToReturn.TB02115_BAIRRO,
+              CALC_RESTANTE: orderToReturn.CALC_RESTANTE,
+              TB01047_NOME: orderToReturn.TB01047_NOME,
+              TB01018_NOME: orderToReturn.TB01018_NOME,
+              TB01073_NOME: orderToReturn.TB01073_NOME
+            };
+            
+            newAvailableOrders.push({
+              cidade: orderToReturn.cidade,
+              ordens: [restoredOrder]
+            });
+          }
+        });
+        
+        setAvailableOrdersState(newAvailableOrders);
+      }
+      
+      setTechnicianGroups(newTechnicianGroups);
+      
+      // Limpar seleção após o sucesso
+      setSelectedOrders([]);
+      
+    } catch (error) {
+      console.error('❌ Erro na requisição de retorno para "Em Aberto":', error);
+      
+      // Criar resultados de erro para o modal
+      const errorResults = orderIdsArray.map(orderId => ({
+        orderId,
+        status: 'error',
+        errorMessage: error.message,
+        cliente: 'N/A'
+      }));
+      
+      setOrderStatusResults(errorResults);
+      setOrderStatusSummary({
+        targetSection: 'Em Aberto',
+        technicianName: null
+      });
+      setShowOrderStatusModal(true);
     }
-    
-    setTechnicianGroups(newTechnicianGroups);
   };
 
   const handleColumnReorder = (dragIndex, hoverIndex) => {
@@ -4438,12 +4874,20 @@ function App() {
           {sortedOrdens.map(ordem => (
             <div 
               key={ordem.id} 
-              className="technician-order-row"
+              className={`technician-order-row ${selectedOrders.includes(ordem.id) ? 'selected' : ''}`}
               onClick={() => handleOrderClick(ordem)}
               draggable
               onDragStart={(e) => {
+                console.log(`🔄 Iniciando drag da ordem ${ordem.id} das colunas de técnicos`);
+                // Selecionar a ordem se não estiver selecionada
+                if (!selectedOrders.includes(ordem.id)) {
+                  console.log(`✅ Selecionando ordem ${ordem.id} para drag`);
+                  setSelectedOrders([ordem.id]);
+                }
                 e.dataTransfer.setData('orderId', ordem.id);
                 e.dataTransfer.setData('fromTechnician', 'true');
+                e.dataTransfer.setData('fromGroup', groupName);
+                console.log(`📋 Dados de transferência definidos: orderId=${ordem.id}, fromTechnician=true, fromGroup=${groupName}`);
               }}
             >
               <div className="technician-order-cell technician-order-id">
@@ -4493,7 +4937,18 @@ function App() {
           if (isDroppable) {
             e.preventDefault();
             e.stopPropagation();
-            handleDropToTechnique(technician, groupName);
+            
+            // Verificar se é um drop entre seções do mesmo técnico
+            const fromTechnician = e.dataTransfer.getData('fromTechnician');
+            const fromGroup = e.dataTransfer.getData('fromGroup');
+            
+            if (fromTechnician === 'true' && fromGroup && fromGroup !== groupName) {
+              // É um drop entre seções do mesmo técnico
+              handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
+            } else {
+              // É um drop da coluna "Em aberto" para o técnico
+              handleDropToTechnique(technician, groupName);
+            }
           }
         }}
         onDragOver={(e) => {
@@ -9636,11 +10091,24 @@ function App() {
                   className={`kanban-column ${isDragOverOpen ? 'drop-target' : ''}`}
                   onDrop={(e) => {
                     e.preventDefault();
+                    console.log(`🎯 Drop detectado na coluna "Em aberto"`);
                     const orderId = e.dataTransfer.getData('orderId');
                     const fromTechnician = e.dataTransfer.getData('fromTechnician');
+                    console.log(`📋 Dados recebidos: orderId=${orderId}, fromTechnician=${fromTechnician}`);
                     
                     if (fromTechnician === 'true' && orderId) {
-                      handleReturnToOpen(orderId);
+                      console.log(`✅ Chamando handleReturnToOpen para ordem ${orderId}`);
+                      console.log(`📋 Ordens selecionadas:`, selectedOrders);
+                      console.log(`📋 Quantidade de ordens selecionadas:`, selectedOrders.length);
+                      
+                      // Se há ordens selecionadas, usar todas elas, senão usar apenas a ordem arrastada
+                      const ordersToReturn = selectedOrders.length > 0 ? selectedOrders : [orderId];
+                      console.log(`📋 Ordens que serão processadas:`, ordersToReturn);
+                      console.log(`📋 Quantidade de ordens a processar:`, ordersToReturn.length);
+                      
+                      handleReturnToOpen(ordersToReturn);
+                    } else {
+                      console.log(`❌ Drop ignorado: fromTechnician=${fromTechnician}, orderId=${orderId}`);
                     }
                     setIsDragOverOpen(false);
                   }}
