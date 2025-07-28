@@ -5305,14 +5305,14 @@ function App() {
                   <div 
                     className="technician-menu-option"
                     onClick={() => {
-                      // Função para visualizar rota de hoje
-                      console.log(`Visualizar rota de hoje para ${technician}`);
+                      // Função para roteirizar ordens de serviço
+                      console.log(`Roteirizar ordens de serviço para ${technician}`);
                       setShowTechnicianMenu(prev => ({ ...prev, [technician]: false }));
                       handleViewTechnicianRoute(technician);
                     }}
                   >
                     <i className="bi bi-geo-alt"></i>
-                    <span>Visualizar rota de hoje</span>
+                    <span>Roteirizar ordens de serviço</span>
                   </div>
                 </div>
                 
@@ -6575,10 +6575,10 @@ function App() {
                       className={`route-map-button ${unroutedOrders.length === 0 || isLoadingAllCoordinates ? 'disabled' : ''}`}
                       onClick={() => setShowUnroutedMap(true)}
                       disabled={unroutedOrders.length === 0 || isLoadingAllCoordinates}
-                      title={unroutedOrders.length === 0 ? 'Nenhuma ordem disponível' : isLoadingAllCoordinates ? 'Carregando coordenadas...' : 'Ver no mapa'}
+                      title={unroutedOrders.length === 0 ? 'Nenhuma ordem disponível' : isLoadingAllCoordinates ? 'Carregando coordenadas...' : 'Roteirizar ordens pelo mapa'}
                     >
                       <i className="bi bi-geo-alt"></i>
-                      <span>Mapa</span>
+                      <span>Roteirizar pelo Mapa</span>
                     </button>
                   </div>
                   <div 
@@ -7051,9 +7051,79 @@ function App() {
                         <div className="route-save-section">
                           <button 
                             className="route-save-btn"
-                            onClick={() => {
-                              // Aqui você pode implementar a lógica para salvar a roteirização
-                              alert(`Roteirização salva com ${mapRoutedOrders.length} ordens!`);
+                            onClick={async () => {
+                              try {
+                                console.log(`💾 Salvando roteirização com ${mapRoutedOrders.length} ordens`);
+                                
+                                // Salvar todas as ordens roteiradas no backend
+                                const savePromises = mapRoutedOrders.map((order, index) => {
+                                  const sequence = index + 1;
+                                  return fetch(`${API_BASE_URL}/api/route/add-order`, {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      technicianId: routeData.technicianId,
+                                      orderNumber: order.id || order.TB02115_CODIGO,
+                                      sequence: sequence,
+                                      forecast: routeData.forecastDate
+                                    })
+                                  });
+                                });
+                                
+                                const responses = await Promise.all(savePromises);
+                                const results = await Promise.all(responses.map(res => res.json()));
+                                
+                                const successCount = results.filter(result => result.success).length;
+                                const errorCount = results.filter(result => !result.success).length;
+                                
+                                if (errorCount === 0) {
+                                  console.log(`✅ Roteirização salva com sucesso: ${successCount} ordens`);
+                                  
+                                  // Atualizar as listas de ordens na tela principal
+                                  const routedOrderIds = mapRoutedOrders.map(order => 
+                                    order.id || order.TB02115_CODIGO
+                                  );
+                                  
+                                  // Adicionar ordens roteiradas à lista "Roteirizadas"
+                                  const newRoutedOrders = mapRoutedOrders.map((order, index) => ({
+                                    ...order,
+                                    routeOrder: index + 1
+                                  }));
+                                  
+                                  setRoutedOrders(prev => [...prev, ...newRoutedOrders]);
+                                  
+                                  // Remover ordens roteiradas da lista "Não Roteirizadas"
+                                  setUnroutedOrders(prev => prev.filter(order => {
+                                    const orderId = order.id || order.TB02115_CODIGO;
+                                    return !routedOrderIds.includes(orderId);
+                                  }));
+                                  
+                                  // Fechar o modal do mapa
+                                  setShowUnroutedMap(false);
+                                  
+                                  // Limpar estados do mapa
+                                  setMapRoutedOrders([]);
+                                  setSelectedMapOrders([]);
+                                  setMapRoutedSequence(1);
+                                  setMapTooltipOrder(null);
+                                  
+                                  // Mostrar mensagem de sucesso
+                                  alert(`✅ Roteirização salva com sucesso!\n${successCount} ordens foram adicionadas à rota.`);
+                                } else {
+                                  console.error(`❌ Erro ao salvar roteirização: ${errorCount} falhas`);
+                                  results.forEach((result, index) => {
+                                    if (!result.success) {
+                                      console.error(`  - Ordem ${mapRoutedOrders[index].id || mapRoutedOrders[index].TB02115_CODIGO}: ${result.message}`);
+                                    }
+                                  });
+                                  alert(`❌ Erro ao salvar roteirização!\n${errorCount} ordens falharam ao serem salvas.`);
+                                }
+                              } catch (error) {
+                                console.error('❌ Erro ao salvar roteirização:', error);
+                                alert('❌ Erro ao salvar roteirização: ' + error.message);
+                              }
                             }}
                           >
                             <i className="bi bi-check-circle"></i>
