@@ -8419,6 +8419,118 @@ initializeApp();
       .filter(item => item.count > 0); // Mostrar apenas tipos que têm ordens
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.sla, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
+  const equipamentosWithCounts = React.useMemo(() => {
+    const filtered = getFilteredOrders;
+    const equipamentoData = {};
+    
+    if (dataSource === 'sql_server' && filtered.length > 0) {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
+            if (selectedColumnFilters.sla.length > 0) {
+              const calcRestante = ordem.CALC_RESTANTE || 0;
+              const sla = getSLAFromCalcRestante(calcRestante);
+              if (!selectedColumnFilters.sla.includes(sla)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const equipamento = ordem.equipamento || ordem.TB01010_NOME || '';
+            if (equipamento) {
+              equipamentoData[equipamento] = (equipamentoData[equipamento] || 0) + 1;
+            }
+          });
+        }
+      });
+    } else {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
+            if (selectedColumnFilters.sla.length > 0) {
+              const calcRestante = ordem.CALC_RESTANTE || 0;
+              const sla = getSLAFromCalcRestante(calcRestante);
+              if (!selectedColumnFilters.sla.includes(sla)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const equipamento = ordem.equipamento || ordem.TB01010_NOME || '';
+            if (equipamento) {
+              equipamentoData[equipamento] = (equipamentoData[equipamento] || 0) + 1;
+            }
+          });
+        }
+      });
+    }
+    
+    return Object.keys(equipamentoData)
+      .map(equipamento => ({ equipamento, count: equipamentoData[equipamento] }))
+      .filter(item => item.count > 0)
+      .sort((a, b) => b.count - a.count); // Ordenar por quantidade decrescente
+  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.sla, selectedColumnFilters.status]);
+
   // Componente dropdown de opções de filtro
   const FilterOptionsDropdown = ({ onSelectFilter, onClose }) => {
     const totalCidades = citiesWithCounts.length;
