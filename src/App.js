@@ -1681,6 +1681,22 @@ function App() {
         setCurrentUser(user);
         setIsAuthenticated(true);
         console.log('🔐 Usuário já autenticado:', user);
+        
+        // Se o usuário é coordenador, aplicar filtro automático
+        console.log('🔍 DEBUG: Verificando se usuário é coordenador:', user);
+        console.log('🔍 DEBUG: user.coordinator:', user.coordinator);
+        console.log('🔍 DEBUG: typeof user.coordinator:', typeof user.coordinator);
+        
+        if (user.coordinator) {
+          console.log('👨‍💼 Usuário é coordenador, aplicando filtro automático');
+          console.log('👨‍💼 Nome do coordenador:', user.name || user.username);
+          setSelectedFilterItems(prev => ({
+            ...prev,
+            coordenador: [user.name || user.username]
+          }));
+        } else {
+          console.log('👤 Usuário não é coordenador');
+        }
       } catch (error) {
         console.error('❌ Erro ao carregar dados do usuário:', error);
         localStorage.removeItem('authToken');
@@ -2478,10 +2494,23 @@ initializeApp();
 
     const isSelected = (item) => currentSelected.includes(item);
 
+    // Verificar se o usuário é coordenador e se estamos no filtro de coordenador
+    const isUserCoordinator = currentUser?.coordinator;
+    const isCoordinatorFilter = type === 'coordenador';
+
     const toggleItem = (item) => {
       console.log('🔍 toggleItem called for:', item, 'type:', type);
       console.log('🔍 currentSelected before:', currentSelected);
       console.log('🔍 isSelected(item):', isSelected(item));
+      
+      // Se o usuário é coordenador e estamos no filtro de coordenador
+      if (isUserCoordinator && isCoordinatorFilter) {
+        // Coordenador só pode selecionar/desmarcar a si mesmo
+        if (item !== (currentUser.name || currentUser.username)) {
+          console.log('🚫 Coordenador não pode selecionar outros coordenadores');
+          return;
+        }
+      }
       
       const newSelection = isSelected(item)
         ? currentSelected.filter(i => i !== item)
@@ -2506,6 +2535,12 @@ initializeApp();
     const clearAll = () => {
       console.log('🔍 clearAll called for type:', type);
       
+      // Se o usuário é coordenador e estamos no filtro de coordenador, não permitir limpar
+      if (isUserCoordinator && isCoordinatorFilter) {
+        console.log('🚫 Coordenador não pode limpar o filtro de coordenador');
+        return;
+      }
+      
       // Aplicar filtros automáticos quando limpar tudo
       const updatedFilters = applyAutomaticFilters(type, []);
       
@@ -2523,12 +2558,20 @@ initializeApp();
       console.log('🔍 selectAll called for type:', type);
       console.log('🔍 selectAll filteredOptions:', filteredOptions);
       
+      // Se o usuário é coordenador e estamos no filtro de coordenador, selecionar apenas a si mesmo
+      let optionsToSelect = filteredOptions;
+      if (isUserCoordinator && isCoordinatorFilter) {
+        const userCoordinatorName = currentUser?.name || currentUser?.username;
+        optionsToSelect = filteredOptions.filter(option => option === userCoordinatorName);
+        console.log('👨‍💼 Coordenador selecionando apenas a si mesmo:', optionsToSelect);
+      }
+      
       // Aplicar filtros automáticos quando selecionar tudo
-      const updatedFilters = applyAutomaticFilters(type, filteredOptions);
+      const updatedFilters = applyAutomaticFilters(type, optionsToSelect);
       
       const finalUpdate = {
         ...selectedFilterItems,
-        [type]: filteredOptions,
+        [type]: optionsToSelect,
         ...updatedFilters
       };
       console.log('🔍 selectAll finalUpdate:', finalUpdate);
@@ -2539,6 +2582,21 @@ initializeApp();
     return (
       <div className="filter-modal">
         <div className={`filter-modal-content ${type === 'tecnico' ? 'technician-filter' : ''}`}>
+          {/* Mensagem informativa para coordenadores */}
+          {isUserCoordinator && isCoordinatorFilter && (
+            <div style={{
+              background: '#e3f2fd',
+              border: '1px solid #2196f3',
+              borderRadius: '4px',
+              padding: '8px 12px',
+              marginBottom: '12px',
+              fontSize: '12px',
+              color: '#1976d2'
+            }}>
+              <strong>👨‍💼 Modo Coordenador:</strong> Você só pode selecionar a si mesmo neste filtro.
+            </div>
+          )}
+          
           <div className="filter-search">
             <input 
               type="text" 
@@ -2551,17 +2609,39 @@ initializeApp();
           </div>
           <div className={`filter-options ${type === 'tecnico' ? 'technician-filter' : ''}`}>
             {filteredOptions.length > 0 ? (
-              filteredOptions.map(option => (
-                <div key={option} className="filter-option">
-                  <input 
-                    type="checkbox" 
-                    id={`${type}-${option}`}
-                    checked={isSelected(option)}
-                    onChange={() => toggleItem(option)}
-                  />
-                  <label htmlFor={`${type}-${option}`}>{option}</label>
-                </div>
-              ))
+              filteredOptions.map(option => {
+                // Verificar se este item deve estar desabilitado para coordenadores
+                const isDisabled = isUserCoordinator && isCoordinatorFilter && 
+                                 option !== (currentUser?.name || currentUser?.username);
+                
+                console.log('🔍 DEBUG: Renderizando checkbox para:', option);
+                console.log('🔍 DEBUG: isUserCoordinator:', isUserCoordinator);
+                console.log('🔍 DEBUG: isCoordinatorFilter:', isCoordinatorFilter);
+                console.log('🔍 DEBUG: currentUser?.name:', currentUser?.name);
+                console.log('🔍 DEBUG: currentUser?.username:', currentUser?.username);
+                console.log('🔍 DEBUG: isDisabled:', isDisabled);
+                
+                return (
+                  <div key={option} className={`filter-option ${isDisabled ? 'disabled' : ''}`}>
+                    <input 
+                      type="checkbox" 
+                      id={`${type}-${option}`}
+                      checked={isSelected(option)}
+                      onChange={() => toggleItem(option)}
+                      disabled={isDisabled}
+                    />
+                    <label 
+                      htmlFor={`${type}-${option}`}
+                      style={isDisabled ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                    >
+                      {option}
+                      {isDisabled && <span style={{ fontSize: '12px', color: '#666', marginLeft: '8px' }}>
+                        (Não disponível para coordenadores)
+                      </span>}
+                    </label>
+                  </div>
+                );
+              })
             ) : (
               <div className="no-results">
                 {options.length === 0 ? 
@@ -2593,6 +2673,10 @@ initializeApp();
   const getFilterOptions = React.useCallback((type) => {
     switch(type) {
       case 'coordenador':
+        console.log('🔍 DEBUG: getFilterOptions - coordenador');
+        console.log('🔍 DEBUG: teamData.coordenadores:', teamData.coordenadores);
+        console.log('🔍 DEBUG: currentUser:', currentUser);
+        
         // Mostrar apenas coordenadores que têm áreas vinculadas (com técnicos)
         const coordenadoresComAreas = teamData.coordenadores.filter(coord => {
           // Verificar se este coordenador tem áreas vinculadas
@@ -2607,6 +2691,7 @@ initializeApp();
         });
         
         const coordOptions = coordenadoresComAreas.map(coord => coord.nome);
+        console.log('🔍 DEBUG: coordOptions:', coordOptions);
         return coordOptions;
       
       case 'area':
