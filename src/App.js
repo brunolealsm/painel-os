@@ -1662,6 +1662,11 @@ function App() {
     setCurrentUser(user);
     setIsAuthenticated(true);
     console.log('✅ Login realizado com sucesso:', user);
+    
+    // Fechar menu de configurações se o usuário não for administrador
+    if (user.type !== '1') {
+      setShowConfigMenu(false);
+    }
   };
 
   const handleLogout = () => {
@@ -1690,17 +1695,16 @@ function App() {
         console.log('🔍 DEBUG: user.username:', user.username);
         console.log('🔍 DEBUG: user object keys:', Object.keys(user));
         
-        console.log('🔍 DEBUG: user.name original:', user.name);
-        console.log('🔍 DEBUG: user.username original:', user.username);
-        console.log('🔍 DEBUG: user.name type:', typeof user.name);
-        console.log('🔍 DEBUG: user.username type:', typeof user.username);
-        console.log('🔍 DEBUG: user.name === undefined:', user.name === undefined);
-        console.log('🔍 DEBUG: user.name === null:', user.name === null);
-        console.log('🔍 DEBUG: user.name === "":', user.name === "");
+
         
         setCurrentUser(user);
         setIsAuthenticated(true);
         console.log('🔐 Usuário já autenticado:', user);
+        
+        // Fechar menu de configurações se o usuário não for administrador
+        if (user.type !== '1') {
+          setShowConfigMenu(false);
+        }
         
         // Se o usuário é coordenador, aplicar filtro automático
         console.log('🔍 DEBUG: Verificando se usuário é coordenador:', user);
@@ -10656,10 +10660,6 @@ initializeApp();
           {/* Componente de usuário logado */}
           {currentUser && (
             <div className="user-info">
-              {console.log('🔍 DEBUG: Renderizando header - currentUser:', currentUser)}
-              {console.log('🔍 DEBUG: currentUser.name:', currentUser.name)}
-              {console.log('🔍 DEBUG: currentUser.username:', currentUser.username)}
-              {console.log('🔍 DEBUG: Nome que será exibido:', currentUser.name || currentUser.username || 'Usuário')}
               <button 
                 className="user-button"
                 onClick={() => setShowLogoutMenu(!showLogoutMenu)}
@@ -10684,17 +10684,21 @@ initializeApp();
             </div>
           )}
           
-          <button 
-            className={`config-btn ${showConfigMenu ? 'active' : ''}`}
-            onClick={() => setShowConfigMenu(!showConfigMenu)}
-            title="Configurações"
-          >
-            ⚙️
-          </button>
+          {/* Botão de configurações - apenas para administradores */}
+          {currentUser && currentUser.type === '1' && (
+            <button 
+              className={`config-btn ${showConfigMenu ? 'active' : ''}`}
+              onClick={() => setShowConfigMenu(!showConfigMenu)}
+              title="Configurações"
+            >
+              ⚙️
+            </button>
+          )}
         </div>
       </header>
 
-      {showConfigMenu && (
+      {/* Menu de configurações - apenas para administradores */}
+      {showConfigMenu && currentUser && currentUser.type === '1' && (
         <div className="config-bar">
           <div className="config-nav">
             <button 
@@ -10719,7 +10723,8 @@ initializeApp();
         </div>
       )}
 
-      {showConfigMenu && activeConfigSection === 'database' && (
+      {/* Conteúdo das configurações - apenas para administradores */}
+      {showConfigMenu && currentUser && currentUser.type === '1' && activeConfigSection === 'database' && (
         <div className="config-content">
           <DatabaseConfig 
             dbConfig={dbConfig}
@@ -10734,13 +10739,13 @@ initializeApp();
             </div>
       )}
 
-      {showConfigMenu && activeConfigSection === 'process' && (
+      {showConfigMenu && currentUser && currentUser.type === '1' && activeConfigSection === 'process' && (
         <div className="config-content">
           <ProcessConfig />
         </div>
       )}
 
-      {showConfigMenu && activeConfigSection === 'users' && (
+      {showConfigMenu && currentUser && currentUser.type === '1' && activeConfigSection === 'users' && (
         <div className="config-content">
           <UserManagement 
             users={users}
