@@ -1652,6 +1652,13 @@ function App() {
   // Funções de autenticação
   const handleLoginSuccess = (user) => {
     console.log('🔍 DEBUG: handleLoginSuccess chamado com user:', user);
+    console.log('🔍 DEBUG: user.name:', user.name);
+    console.log('🔍 DEBUG: user.username:', user.username);
+    console.log('🔍 DEBUG: user object keys:', Object.keys(user));
+    
+    console.log('🔍 DEBUG: user.name original (login):', user.name);
+    console.log('🔍 DEBUG: user.username original (login):', user.username);
+    
     setCurrentUser(user);
     setIsAuthenticated(true);
     console.log('✅ Login realizado com sucesso:', user);
@@ -1678,6 +1685,19 @@ function App() {
     if (token && userData) {
       try {
         const user = JSON.parse(userData);
+        console.log('🔍 DEBUG: User data from localStorage:', user);
+        console.log('🔍 DEBUG: user.name:', user.name);
+        console.log('🔍 DEBUG: user.username:', user.username);
+        console.log('🔍 DEBUG: user object keys:', Object.keys(user));
+        
+        console.log('🔍 DEBUG: user.name original:', user.name);
+        console.log('🔍 DEBUG: user.username original:', user.username);
+        console.log('🔍 DEBUG: user.name type:', typeof user.name);
+        console.log('🔍 DEBUG: user.username type:', typeof user.username);
+        console.log('🔍 DEBUG: user.name === undefined:', user.name === undefined);
+        console.log('🔍 DEBUG: user.name === null:', user.name === null);
+        console.log('🔍 DEBUG: user.name === "":', user.name === "");
+        
         setCurrentUser(user);
         setIsAuthenticated(true);
         console.log('🔐 Usuário já autenticado:', user);
@@ -10636,13 +10656,17 @@ initializeApp();
           {/* Componente de usuário logado */}
           {currentUser && (
             <div className="user-info">
+              {console.log('🔍 DEBUG: Renderizando header - currentUser:', currentUser)}
+              {console.log('🔍 DEBUG: currentUser.name:', currentUser.name)}
+              {console.log('🔍 DEBUG: currentUser.username:', currentUser.username)}
+              {console.log('🔍 DEBUG: Nome que será exibido:', currentUser.name || currentUser.username || 'Usuário')}
               <button 
                 className="user-button"
                 onClick={() => setShowLogoutMenu(!showLogoutMenu)}
-                title={`Usuário: ${currentUser.name}`}
+                title={`Usuário: ${currentUser.name || currentUser.username || 'Usuário'}`}
               >
                 <i className="bi bi-person-circle"></i>
-                <span className="user-name">{currentUser.name}</span>
+                <span className="user-name">{currentUser.name || currentUser.username || 'Usuário'}</span>
                 <i className="bi bi-chevron-down"></i>
               </button>
               

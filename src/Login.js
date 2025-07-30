@@ -28,6 +28,11 @@ const Login = ({ onLoginSuccess }) => {
 
           const result = await response.json();
           
+          console.log('🔍 DEBUG: Resultado da verificação de token:', result);
+          console.log('🔍 DEBUG: result.user:', result.user);
+          console.log('🔍 DEBUG: result.user.name:', result.user?.name);
+          console.log('🔍 DEBUG: result.user.username:', result.user?.username);
+          
           if (result.success) {
             // Token válido, fazer login automático
             localStorage.setItem('userData', JSON.stringify(result.user));
@@ -85,6 +90,11 @@ const Login = ({ onLoginSuccess }) => {
       });
 
       const result = await response.json();
+
+      console.log('🔍 DEBUG: Resultado do login:', result);
+      console.log('🔍 DEBUG: result.user:', result.user);
+      console.log('🔍 DEBUG: result.user.name:', result.user?.name);
+      console.log('🔍 DEBUG: result.user.username:', result.user?.username);
 
       if (result.success) {
         // Salvar token e dados do usuário
