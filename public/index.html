@@ -42,6 +42,74 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    
+    <!-- Script de debug para o sistema de login -->
+    <script>
+      // Script de debug para o sistema de login
+      console.log('🔍 DEBUG: Script de debug carregado');
+
+      // Função para verificar localStorage
+      function checkLocalStorage() {
+        console.log('🔍 DEBUG: Verificando localStorage...');
+        const token = localStorage.getItem('authToken');
+        const userData = localStorage.getItem('userData');
+        
+        console.log('🔍 DEBUG: Token:', token ? 'Encontrado' : 'Não encontrado');
+        console.log('🔍 DEBUG: UserData:', userData ? 'Encontrado' : 'Não encontrado');
+        
+        if (userData) {
+          try {
+            const user = JSON.parse(userData);
+            console.log('🔍 DEBUG: Dados do usuário:', user);
+          } catch (error) {
+            console.error('❌ Erro ao parsear userData:', error);
+          }
+        }
+      }
+
+      // Função para limpar localStorage
+      function clearLocalStorage() {
+        console.log('🔍 DEBUG: Limpando localStorage...');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+        console.log('✅ localStorage limpo');
+      }
+
+      // Função para testar API
+      async function testAPI() {
+        console.log('🔍 DEBUG: Testando API...');
+        try {
+          const response = await fetch('http://localhost:3002/api/auth/verify', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const result = await response.json();
+          console.log('🔍 DEBUG: Resultado da verificação:', result);
+        } catch (error) {
+          console.error('❌ Erro ao testar API:', error);
+        }
+      }
+
+      // Adicionar funções ao window para acesso via console
+      window.debugLogin = {
+        checkLocalStorage,
+        clearLocalStorage,
+        testAPI
+      };
+
+      console.log('🔍 DEBUG: Funções disponíveis:');
+      console.log('  - debugLogin.checkLocalStorage()');
+      console.log('  - debugLogin.clearLocalStorage()');
+      console.log('  - debugLogin.testAPI()');
+
+      // Executar verificação inicial
+      checkLocalStorage();
+    </script>
+    
     <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.

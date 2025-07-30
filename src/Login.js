@@ -1,14 +1,52 @@
 import React, { useState, useEffect } from 'react';
 import './Login.css';
 
-const Login = ({ onLogin }) => {
+const API_BASE_URL = 'http://localhost:3002';
+
+const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   });
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Verificar se já existe um token válido ao carregar
+  useEffect(() => {
+    const checkExistingToken = async () => {
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const result = await response.json();
+          
+          if (result.success) {
+            // Token válido, fazer login automático
+            localStorage.setItem('userData', JSON.stringify(result.user));
+            onLoginSuccess(result.user);
+          } else {
+            // Token inválido, remover do localStorage
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+          }
+        } catch (error) {
+          console.error('Erro ao verificar token:', error);
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('userData');
+        }
+      }
+    };
+
+    checkExistingToken();
+  }, [onLoginSuccess]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -16,107 +54,122 @@ const Login = ({ onLogin }) => {
       ...prev,
       [name]: value
     }));
-    // Limpar erro quando usuário digita
-    if (error) setError('');
+    
+    // Limpar erro quando o usuário digita
+    if (error) {
+      setError('');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    
+    if (!formData.username.trim() || !formData.password.trim()) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+
+    setIsLoading(true);
     setError('');
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          password: formData.password
+        })
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (data.success) {
-        // Salvar token no localStorage
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('userData', JSON.stringify(data.user));
+      if (result.success) {
+        // Salvar token e dados do usuário
+        localStorage.setItem('authToken', result.token);
+        localStorage.setItem('userData', JSON.stringify(result.user));
         
-        // Chamar função de login do App.js
-        onLogin(data.user, data.token);
+        // Chamar callback de sucesso
+        onLoginSuccess(result.user);
       } else {
-        setError(data.message || 'Erro ao fazer login');
+        setError(result.message || 'Erro no login');
       }
-    } catch (err) {
+    } catch (error) {
+      console.error('Erro no login:', error);
       setError('Erro de conexão. Verifique se o servidor está rodando.');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e);
+    }
   };
 
   return (
     <div className="login-container">
-      <div className="login-background">
-        <div className="login-pattern"></div>
-      </div>
-      
       <div className="login-card">
         <div className="login-header">
           <div className="login-logo">
-            <div className="logo-icon">
-              <i className="fas fa-tools"></i>
-            </div>
-            <h1>PainelOS</h1>
+            <i className="bi bi-gear-fill"></i>
           </div>
-          <p className="login-subtitle">Sistema de Gestão de Ordens de Serviço</p>
+          <h1>PainelOS</h1>
+          <p>Sistema de Gestão de Ordens de Serviço</p>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <div className="form-group">
+            <label htmlFor="username">Usuário</label>
             <div className="input-container">
-              <i className="fas fa-user input-icon"></i>
+              <i className="bi bi-person input-icon"></i>
               <input
                 type="text"
+                id="username"
                 name="username"
-                placeholder="Usuário"
                 value={formData.username}
                 onChange={handleInputChange}
-                required
+                onKeyPress={handleKeyPress}
+                placeholder="Digite seu usuário"
+                className="form-input"
                 autoComplete="username"
-                className="login-input"
+                autoFocus
               />
             </div>
           </div>
 
           <div className="form-group">
+            <label htmlFor="password">Senha</label>
             <div className="input-container">
-              <i className="fas fa-lock input-icon"></i>
+              <i className="bi bi-lock input-icon"></i>
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
+                id="password"
                 name="password"
-                placeholder="Senha"
                 value={formData.password}
                 onChange={handleInputChange}
-                required
+                onKeyPress={handleKeyPress}
+                placeholder="Digite sua senha"
+                className="form-input"
                 autoComplete="current-password"
-                className="login-input"
               />
               <button
                 type="button"
                 className="password-toggle"
-                onClick={togglePasswordVisibility}
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex="-1"
               >
-                <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
               </button>
             </div>
           </div>
 
           {error && (
             <div className="error-message">
-              <i className="fas fa-exclamation-circle"></i>
+              <i className="bi bi-exclamation-circle"></i>
               {error}
             </div>
           )}
@@ -124,16 +177,16 @@ const Login = ({ onLogin }) => {
           <button
             type="submit"
             className="login-button"
-            disabled={loading}
+            disabled={isLoading}
           >
-            {loading ? (
+            {isLoading ? (
               <>
-                <i className="fas fa-spinner fa-spin"></i>
+                <i className="bi bi-arrow-repeat spin"></i>
                 Entrando...
               </>
             ) : (
               <>
-                <i className="fas fa-sign-in-alt"></i>
+                <i className="bi bi-box-arrow-in-right"></i>
                 Entrar
               </>
             )}
@@ -141,7 +194,7 @@ const Login = ({ onLogin }) => {
         </form>
 
         <div className="login-footer">
-          <p>© 2024 PainelOS. Todos os direitos reservados.</p>
+          <p>© 2024 PainelOS - Sistema de Gestão</p>
         </div>
       </div>
     </div>

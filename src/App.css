@@ -3064,17 +3064,36 @@ body {
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.2s ease;
-  background: white;
+  background: white !important;
+  color: #2d3748 !important;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #7c4dff;
   box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.1);
+  background: white !important;
 }
 
 .form-input::placeholder {
   color: #a0aec0;
+}
+
+/* Estilos específicos para inputs das configurações */
+.database-config .form-input,
+.config-content .form-input {
+  background: white !important;
+  color: #2d3748 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.database-config .form-input:focus,
+.config-content .form-input:focus {
+  background: white !important;
+  border-color: #7c4dff !important;
+  color: #2d3748 !important;
 }
 
 .form-actions {
@@ -3131,7 +3150,30 @@ body {
   width: 50px;
   max-width: 50px;
   min-width: 50px;
-  font-size: 16px;
+  font-size: 12px; /* Reduzido para corresponder ao texto de ajuda */
+  background: white;
+  color: #2d3748;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 3px; /* Reduzido em 60% de 8px para 3px */
+  box-sizing: border-box;
+  height: 20px; /* Altura reduzida em 60% */
+}
+
+.process-input:focus {
+  outline: none;
+  border-color: #7c4dff;
+  box-shadow: 0 0 0 3px rgba(124, 77, 255, 0.1);
+  background: white;
+}
+
+/* Reduzir tamanho das fontes dos títulos em 20% */
+.database-config .form-group label {
+  font-size: 12px; /* Reduzido em 20% de 15px para 12px */
+  font-weight: 500;
+  color: #2d3748;
+  margin-bottom: 4px;
+  display: block;
 }
 
 .form-help {
@@ -7862,5 +7904,109 @@ body {
 
 .defeito-table tbody tr:hover {
   background-color: #f8f9fa;
+}
+
+/* User Info and Logout Styles */
+.user-info {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #4a5568;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-button:hover {
+  background-color: #f7fafc;
+  color: #2d3748;
+}
+
+.user-button i {
+  font-size: 16px;
+}
+
+.user-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  z-index: 1000;
+  margin-top: 4px;
+  animation: fadeIn 0.2s ease;
+}
+
+.logout-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #4a5568;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
+
+.logout-option:hover {
+  background-color: #f7fafc;
+  color: #e53e3e;
+}
+
+.logout-option i {
+  font-size: 16px;
+}
+
+/* Responsive adjustments for user info */
+@media (max-width: 768px) {
+  .user-name {
+    max-width: 80px;
+  }
+  
+  .logout-menu {
+    right: -20px;
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 480px) {
+  .user-button {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  
+  .user-name {
+    max-width: 60px;
+  }
+  
+  .logout-menu {
+    right: -40px;
+    min-width: 140px;
+  }
 }
 

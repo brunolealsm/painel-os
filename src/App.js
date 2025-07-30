@@ -5,8 +5,8 @@ import ReactFlow, {
   Background, 
   useNodesState, 
   useEdgesState,
-  ConnectionLineType,
-  MarkerType,
+  ConnectionLineType, 
+  MarkerType, 
   Position 
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -14,6 +14,7 @@ import dagre from 'dagre';
 import html2canvas from 'html2canvas';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
+import Login from './Login';
 
 // Configuração da API
 const API_BASE_URL = 'http://localhost:3002';
@@ -238,218 +239,311 @@ const DatabaseConfig = ({
 
 // Componente de configuração dos processos
 const ProcessConfig = () => {
-  const [processConfig, setProcessConfig] = useState({
-    status_inservice: '',
-    status_forward: '',
-    status_tomorrow: '',
-    status_uptodate: '',
-    status_open: ''
-  });
+  // Estado usando useRef para evitar problemas de renderização
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null);
+  const [message, setMessage] = useState('');
+  
+  // Usar refs para os inputs - abordagem mais direta
+  const statusInserviceRef = useRef(null);
+  const statusForwardRef = useRef(null);
+  const statusTomorrowRef = useRef(null);
+  const statusUptodateRef = useRef(null);
+  const statusOpenRef = useRef(null);
 
-  // Função para validar entrada
-  const validateInput = (value) => {
-    // Aceita apenas letras e números, máximo 2 caracteres
-    const regex = /^[A-Za-z0-9]{0,2}$/;
-    return regex.test(value);
-  };
-
-  // Função para lidar com mudanças nos inputs
-  const handleInputChange = (field, value) => {
-    if (validateInput(value)) {
-      setProcessConfig(prev => ({
-        ...prev,
-        [field]: value.toUpperCase() // Converter para maiúsculo
-      }));
-      setSaveStatus(null);
-    }
-  };
-
-  // Carregar configurações existentes
-  const loadProcessConfig = async () => {
+  // Função para carregar dados da API
+  const loadData = async () => {
     try {
       setIsLoading(true);
-      console.log('🔄 Carregando configurações de processo...');
+      setMessage('');
       
-      const response = await fetch(`${API_BASE_URL}/api/config/process`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
+      const response = await fetch(`${API_BASE_URL}/api/config/process`);
       const result = await response.json();
       
       if (result.success && result.data) {
-        console.log('✅ Configurações de processo carregadas:', result.data);
-        setProcessConfig({
-          status_inservice: result.data.status_inservice || '',
-          status_forward: result.data.status_forward || '',
-          status_tomorrow: result.data.status_tomorrow || '',
-          status_uptodate: result.data.status_uptodate || '',
-          status_open: result.data.status_open || ''
-        });
+        // Definir valores diretamente nos inputs
+        if (statusInserviceRef.current) statusInserviceRef.current.value = result.data.status_inservice || '';
+        if (statusForwardRef.current) statusForwardRef.current.value = result.data.status_forward || '';
+        if (statusTomorrowRef.current) statusTomorrowRef.current.value = result.data.status_tomorrow || '';
+        if (statusUptodateRef.current) statusUptodateRef.current.value = result.data.status_uptodate || '';
+        if (statusOpenRef.current) statusOpenRef.current.value = result.data.status_open || '';
       } else {
-        console.log('ℹ️ Nenhuma configuração encontrada, usando valores padrão');
+        // Valores padrão
+        if (statusInserviceRef.current) statusInserviceRef.current.value = 'ES';
+        if (statusForwardRef.current) statusForwardRef.current.value = 'ET';
+        if (statusTomorrowRef.current) statusTomorrowRef.current.value = 'PD';
+        if (statusUptodateRef.current) statusUptodateRef.current.value = 'ED';
+        if (statusOpenRef.current) statusOpenRef.current.value = 'EA';
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar configurações de processo:', error);
-      setSaveStatus({
-        success: false,
-        message: `Erro ao carregar configurações: ${error.message}`
-      });
+      console.error('Erro ao carregar dados:', error);
+      setMessage('Erro ao carregar dados da API');
+      // Valores padrão em caso de erro
+      if (statusInserviceRef.current) statusInserviceRef.current.value = 'ES';
+      if (statusForwardRef.current) statusForwardRef.current.value = 'ET';
+      if (statusTomorrowRef.current) statusTomorrowRef.current.value = 'PD';
+      if (statusUptodateRef.current) statusUptodateRef.current.value = 'ED';
+      if (statusOpenRef.current) statusOpenRef.current.value = 'EA';
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Salvar configurações
-  const saveProcessConfig = async () => {
+  // Função para salvar dados
+  const saveData = async () => {
     try {
       setIsSaving(true);
-      setSaveStatus(null);
-      console.log('💾 Salvando configurações de processo...');
-
+      setMessage('');
+      
+      const formData = {
+        status_inservice: statusInserviceRef.current?.value || '',
+        status_forward: statusForwardRef.current?.value || '',
+        status_tomorrow: statusTomorrowRef.current?.value || '',
+        status_uptodate: statusUptodateRef.current?.value || '',
+        status_open: statusOpenRef.current?.value || ''
+      };
+      
       const response = await fetch(`${API_BASE_URL}/api/config/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(processConfig)
+        body: JSON.stringify(formData)
       });
 
       const result = await response.json();
       
       if (result.success) {
-        console.log('✅ Configurações de processo salvas com sucesso!');
-        setSaveStatus({
-          success: true,
-          message: 'Configurações salvas com sucesso!'
-        });
+        setMessage('Configurações salvas com sucesso!');
       } else {
-        console.log('❌ Erro ao salvar:', result.message);
-        setSaveStatus({
-          success: false,
-          message: result.message
-        });
+        setMessage('Erro ao salvar configurações');
       }
     } catch (error) {
-      console.error('❌ Erro ao salvar configurações:', error);
-      setSaveStatus({
-        success: false,
-        message: `Erro ao salvar: ${error.message}`
-      });
+      console.error('Erro ao salvar:', error);
+      setMessage('Erro ao salvar configurações');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Carregar dados na inicialização
+  // Função para converter para maiúsculas
+  const handleInputChange = (ref) => {
+    if (ref.current) {
+      ref.current.value = ref.current.value.toUpperCase();
+    }
+  };
+
+  // Carregar dados ao montar o componente
   useEffect(() => {
-    loadProcessConfig();
+    loadData();
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="database-config">
+        <h3 className="config-title">Configuração de processos</h3>
+        <p className="config-description">Configure o processo de ordens de serviço</p>
+        <div style={{ textAlign: 'center', padding: '20px', color: '#6c757d' }}>
+          Carregando configurações...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="database-config">
       <h3 className="config-title">Configuração de processos</h3>
       <p className="config-description">Configure o processo de ordens de serviço</p>
       
-      {isLoading ? (
-        <div className="loading-message">Carregando configurações...</div>
-      ) : (
-        <div className="config-form">
-          <div className="form-group">
-            <label htmlFor="status_inservice">Em serviço</label>
-            <input
-              type="text"
-              id="status_inservice"
-              value={processConfig.status_inservice}
-              onChange={(e) => handleInputChange('status_inservice', e.target.value)}
-              placeholder="Ex: ES"
-              className="form-input process-input"
-              maxLength="2"
-            />
-            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="status_inservice">Encaminhado ao técnico</label>
-            <input
-              type="text"
-              id="status_inservice"
-              value={processConfig.status_inservice}
-              onChange={(e) => handleInputChange('status_inservice', e.target.value)}
-              placeholder="Ex: ET"
-              className="form-input process-input"
-              maxLength="2"
-            />
-            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="status_tomorrow">Para atender no próximo dia</label>
-            <input
-              type="text"
-              id="status_tomorrow"
-              value={processConfig.status_tomorrow}
-              onChange={(e) => handleInputChange('status_tomorrow', e.target.value)}
-              placeholder="Ex: PD"
-              className="form-input process-input"
-              maxLength="2"
-            />
-            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="status_uptodate">Em dia ou futura</label>
-            <input
-              type="text"
-              id="status_uptodate"
-              value={processConfig.status_uptodate}
-              onChange={(e) => handleInputChange('status_uptodate', e.target.value)}
-              placeholder="Ex: ED"
-              className="form-input process-input"
-              maxLength="2"
-            />
-            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="status_open">Em Aberto</label>
-            <input
-              type="text"
-              id="status_open"
-              value={processConfig.status_open}
-              onChange={(e) => handleInputChange('status_open', e.target.value)}
-              placeholder="Ex: EA"
-              className="form-input process-input"
-              maxLength="2"
-            />
-            <small className="form-help">Máximo 2 caracteres (letras e números)</small>
-          </div>
-
-          <div className="form-actions">
-            <button 
-              onClick={saveProcessConfig}
-              disabled={isSaving}
-              className="btn-save"
-            >
-              {isSaving ? 'Salvando...' : 'Salvar dados'}
-            </button>
-          </div>
-
-          {saveStatus && (
-            <div className={`connection-status ${saveStatus.success ? 'success' : 'error'}`}>
-              <span className="status-icon">
-                {saveStatus.success ? '✓' : '✗'}
-              </span>
-              <span className="status-message">{saveStatus.message}</span>
-            </div>
-          )}
+      <div className="config-form">
+        <div className="form-group">
+          <label htmlFor="status_inservice">Em serviço</label>
+          <input
+            ref={statusInserviceRef}
+            type="text"
+            id="status_inservice"
+            placeholder="Ex: ES"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusInserviceRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
         </div>
-      )}
+
+        <div className="form-group">
+          <label htmlFor="status_forward">Encaminhado ao técnico</label>
+          <input
+            ref={statusForwardRef}
+            type="text"
+            id="status_forward"
+            placeholder="Ex: ET"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusForwardRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="status_tomorrow">Para atender no próximo dia</label>
+          <input
+            ref={statusTomorrowRef}
+            type="text"
+            id="status_tomorrow"
+            placeholder="Ex: PD"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusTomorrowRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="status_uptodate">Em dia ou futura</label>
+          <input
+            ref={statusUptodateRef}
+            type="text"
+            id="status_uptodate"
+            placeholder="Ex: ED"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusUptodateRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="status_open">Em Aberto</label>
+          <input
+            ref={statusOpenRef}
+            type="text"
+            id="status_open"
+            placeholder="Ex: EA"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusOpenRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+        </div>
+
+        <div className="form-actions">
+          <button 
+            onClick={saveData}
+            disabled={isSaving}
+            style={{
+              background: '#7c4dff',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            {isSaving ? 'Salvando...' : 'Salvar dados'}
+          </button>
+        </div>
+
+        {message && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            borderRadius: '6px',
+            fontSize: '14px',
+            background: message.includes('sucesso') ? '#f0fff4' : '#fed7d7',
+            color: message.includes('sucesso') ? '#22543d' : '#742a2a',
+            border: `1px solid ${message.includes('sucesso') ? '#9ae6b4' : '#fc8181'}`
+          }}>
+            {message}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1049,6 +1143,11 @@ const UserManagement = ({
 };
 
 function App() {
+  // Estados de autenticação
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+
   const [activeSection, setActiveSection] = useState('Board');
   const [activeFilters, setActiveFilters] = useState({
     coordenador: null,
@@ -1340,13 +1439,19 @@ function App() {
         setRouteModalData(null);
         setRouteModalError(null);
       }
+
+      // Fechar menu de logout
+      if (showLogoutMenu && 
+          !event.target.closest('.user-info')) {
+        setShowLogoutMenu(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, showTechnicianMenu, openCityDropdown, showOrderSidebar, showEquipmentSidebar, areaOptionsMenus, areaActionMenus, showManagementDiagram, showRouteModal]);
+  }, [showColumnFilter, showFilterOptions, showTechnicianFilter, showTechnicianMenu, openCityDropdown, showOrderSidebar, showEquipmentSidebar, areaOptionsMenus, areaActionMenus, showManagementDiagram, showRouteModal, showLogoutMenu]);
   const [activeConfigSection, setActiveConfigSection] = useState('database');
   
   // Estado para controlar ordens disponíveis (removidas quando movidas)
@@ -1543,6 +1648,48 @@ function App() {
   ]);
   const [loadingHasError, setLoadingHasError] = useState(false);
   const [loadingErrorMessage, setLoadingErrorMessage] = useState('');
+
+  // Funções de autenticação
+  const handleLoginSuccess = (user) => {
+    console.log('🔍 DEBUG: handleLoginSuccess chamado com user:', user);
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    console.log('✅ Login realizado com sucesso:', user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('userData');
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setShowLogoutMenu(false);
+    console.log('🚪 Logout realizado');
+  };
+
+  // Verificar autenticação ao carregar
+  useEffect(() => {
+    console.log('🔍 DEBUG: Verificando autenticação ao carregar...');
+    const token = localStorage.getItem('authToken');
+    const userData = localStorage.getItem('userData');
+    
+    console.log('🔍 DEBUG: Token encontrado:', !!token);
+    console.log('🔍 DEBUG: UserData encontrado:', !!userData);
+    
+    if (token && userData) {
+      try {
+        const user = JSON.parse(userData);
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+        console.log('🔐 Usuário já autenticado:', user);
+      } catch (error) {
+        console.error('❌ Erro ao carregar dados do usuário:', error);
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userData');
+      }
+    } else {
+      console.log('🔍 DEBUG: Nenhum token ou userData encontrado');
+    }
+  }, []);
 
   // Função para atualizar status de uma etapa
   const updateLoadingStep = useCallback((stepId, status) => {
@@ -1912,6 +2059,17 @@ function App() {
 
   // Carregar dados iniciais com modal de progresso
   useEffect(() => {
+    console.log('🔍 DEBUG: useEffect de inicialização chamado');
+    console.log('🔍 DEBUG: isAuthenticated =', isAuthenticated);
+    console.log('🔍 DEBUG: currentUser =', currentUser);
+    
+    // Só inicializar se o usuário estiver autenticado
+    if (!isAuthenticated) {
+      console.log('🔍 DEBUG: Usuário não autenticado, não inicializando');
+      return;
+    }
+
+    console.log('🔍 DEBUG: Usuário autenticado, iniciando carregamento...');
     const initializeApp = async () => {
       try {
         // Etapa 1: Carregar configuração
@@ -2047,21 +2205,21 @@ function App() {
         await new Promise(resolve => setTimeout(resolve, 500));
         updateLoadingStep('complete', 'completed');
         
-        // Aguardar um pouco para mostrar que completou
-        setTimeout(() => {
-          setIsInitialLoading(false);
-        }, 800);
-        
-      } catch (error) {
-        console.error('❌ Erro durante inicialização:', error);
-        updateLoadingStep('orders', 'error');
-        setLoadingHasError(true);
-        setLoadingErrorMessage('Erro inesperado durante a inicialização do sistema.');
-      }
-    };
+            // Aguardar um pouco para mostrar que completou
+    setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 800);
+    
+  } catch (error) {
+    console.error('❌ Erro durante inicialização:', error);
+    updateLoadingStep('orders', 'error');
+    setLoadingHasError(true);
+    setLoadingErrorMessage('Erro inesperado durante a inicialização do sistema.');
+  }
+};
 
-    initializeApp();
-  }, [loadOrdersFromAPI, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI, updateLoadingStep]);
+initializeApp();
+}, [loadOrdersFromAPI, loadTechniciansFromAPI, loadAreasFromAPI, loadCoordinatorsFromAPI, loadAreaTeamFromAPI, loadAreaCoordFromAPI, updateLoadingStep, isAuthenticated]);
 
   // Recarregar dados quando a configuração for salva
   useEffect(() => {
@@ -7856,141 +8014,6 @@ function App() {
       .sort((a, b) => a.cliente.localeCompare(b.cliente));
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.tipoOS, selectedColumnFilters.sla, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
-  const equipamentosWithCounts = React.useMemo(() => {
-    const filtered = getFilteredOrders;
-    const equipamentoData = {};
-    
-    if (dataSource === 'sql_server' && filtered.length > 0) {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
-            if (selectedColumnFilters.tipoOS.length > 0) {
-              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
-            if (selectedColumnFilters.sla.length > 0) {
-              const calcRestante = ordem.CALC_RESTANTE || 0;
-              const sla = getSLAFromCalcRestante(calcRestante);
-              if (!selectedColumnFilters.sla.includes(sla)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-            if (equipamento && equipamento.trim() !== '') {
-              if (!equipamentoData[equipamento]) {
-                equipamentoData[equipamento] = 0;
-              }
-              equipamentoData[equipamento] += 1;
-            }
-          });
-        }
-      });
-    } else {
-      filtered.forEach(item => {
-        // Se há filtros de cidade aplicados, considerar apenas essas cidades
-        if (selectedColumnFilters.cidade.length > 0 && 
-            !selectedColumnFilters.cidade.includes(item.cidade)) {
-          return;
-        }
-        
-        if (item.ordens) {
-          item.ordens.forEach(ordem => {
-            // Se há filtro de bairro aplicado, considerar apenas esses bairros
-            if (selectedColumnFilters.bairro.length > 0) {
-              const bairro = ordem.TB02115_BAIRRO || '';
-              if (!selectedColumnFilters.bairro.includes(bairro)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de cliente aplicado, considerar apenas esses clientes
-            if (selectedColumnFilters.cliente.length > 0) {
-              const cliente = ordem.cliente || ordem.TB01008_NOME;
-              if (!selectedColumnFilters.cliente.includes(cliente)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de tipo de OS aplicado, considerar apenas esses tipos
-            if (selectedColumnFilters.tipoOS.length > 0) {
-              const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
-              const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
-              if (!selectedColumnFilters.tipoOS.includes(tipoVisual)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
-            if (selectedColumnFilters.sla.length > 0) {
-              const calcRestante = ordem.CALC_RESTANTE || 0;
-              const sla = getSLAFromCalcRestante(calcRestante);
-              if (!selectedColumnFilters.sla.includes(sla)) {
-                return;
-              }
-            }
-            
-            // Se há filtro de status aplicado, considerar apenas esses status
-            if (selectedColumnFilters.status.length > 0) {
-              const status = ordem.TB01073_NOME || '';
-              if (!selectedColumnFilters.status.includes(status)) {
-                return;
-              }
-            }
-            
-            const equipamento = ordem.equipamento || ordem.TB01010_NOME;
-            if (equipamento && equipamento.trim() !== '') {
-              if (!equipamentoData[equipamento]) {
-                equipamentoData[equipamento] = 0;
-              }
-              equipamentoData[equipamento] += 1;
-            }
-          });
-        }
-      });
-    }
-    
-    return Object.entries(equipamentoData)
-      .map(([equipamento, count]) => ({ equipamento, count }))
-      .sort((a, b) => a.equipamento.localeCompare(b.equipamento));
-  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.sla, selectedColumnFilters.status]);
-
   const statusWithCounts = React.useMemo(() => {
     const filtered = getFilteredOrders;
     const statusData = {};
@@ -8260,6 +8283,141 @@ function App() {
       .map(sla => ({ sla, count: slaData[sla] }))
       .filter(item => item.count > 0); // Mostrar apenas SLAs que têm ordens
   }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.tipoOS, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
+
+  const tiposOSWithCounts = React.useMemo(() => {
+    const filtered = getFilteredOrders;
+    const tipoData = {};
+    
+    // Definir todos os tipos de OS possíveis para garantir ordem consistente
+    const allTipos = ['Preventiva', 'Corretiva', 'Instalação'];
+    allTipos.forEach(tipo => {
+      tipoData[tipo] = 0;
+    });
+    
+    if (dataSource === 'sql_server' && filtered.length > 0) {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
+            if (selectedColumnFilters.sla.length > 0) {
+              const calcRestante = ordem.CALC_RESTANTE || 0;
+              const sla = getSLAFromCalcRestante(calcRestante);
+              if (!selectedColumnFilters.sla.includes(sla)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
+            if (selectedColumnFilters.equipamento.length > 0) {
+              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
+            const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
+            if (tipoData.hasOwnProperty(tipoVisual)) {
+              tipoData[tipoVisual] += 1;
+            }
+          });
+        }
+      });
+    } else {
+      filtered.forEach(item => {
+        // Se há filtros de cidade aplicados, considerar apenas essas cidades
+        if (selectedColumnFilters.cidade.length > 0 && 
+            !selectedColumnFilters.cidade.includes(item.cidade)) {
+          return;
+        }
+        
+        if (item.ordens) {
+          item.ordens.forEach(ordem => {
+            // Se há filtro de bairro aplicado, considerar apenas esses bairros
+            if (selectedColumnFilters.bairro.length > 0) {
+              const bairro = ordem.TB02115_BAIRRO || '';
+              if (!selectedColumnFilters.bairro.includes(bairro)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de cliente aplicado, considerar apenas esses clientes
+            if (selectedColumnFilters.cliente.length > 0) {
+              const cliente = ordem.cliente || ordem.TB01008_NOME;
+              if (!selectedColumnFilters.cliente.includes(cliente)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de SLA aplicado, considerar apenas esses SLAs
+            if (selectedColumnFilters.sla.length > 0) {
+              const calcRestante = ordem.CALC_RESTANTE || 0;
+              const sla = getSLAFromCalcRestante(calcRestante);
+              if (!selectedColumnFilters.sla.includes(sla)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
+            if (selectedColumnFilters.equipamento.length > 0) {
+              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              if (!selectedColumnFilters.equipamento.includes(equipamento)) {
+                return;
+              }
+            }
+            
+            // Se há filtro de status aplicado, considerar apenas esses status
+            if (selectedColumnFilters.status.length > 0) {
+              const status = ordem.TB01073_NOME || '';
+              if (!selectedColumnFilters.status.includes(status)) {
+                return;
+              }
+            }
+            
+            const tipoOriginal = ordem.TB02115_PREVENTIVA || 'N';
+            const tipoVisual = getServiceTypeFromPreventiva(tipoOriginal);
+            if (tipoData.hasOwnProperty(tipoVisual)) {
+              tipoData[tipoVisual] += 1;
+            }
+          });
+        }
+      });
+    }
+    
+    return allTipos
+      .map(tipo => ({ tipo, count: tipoData[tipo] }))
+      .filter(item => item.count > 0); // Mostrar apenas tipos que têm ordens
+  }, [getFilteredOrders, dataSource, selectedColumnFilters.cidade, selectedColumnFilters.bairro, selectedColumnFilters.cliente, selectedColumnFilters.sla, selectedColumnFilters.equipamento, selectedColumnFilters.status]);
 
   // Componente dropdown de opções de filtro
   const FilterOptionsDropdown = ({ onSelectFilter, onClose }) => {
@@ -8817,7 +8975,7 @@ function App() {
                 autoFocus
               />
             </div>
-            
+
             <div className="column-filter-content">
               <div className="column-filter-options">
                 {filteredCities.length > 0 ? (
@@ -8876,7 +9034,7 @@ function App() {
                 autoFocus
               />
             </div>
-            
+
             <div className="column-filter-content">
               <div className="column-filter-options">
                 {filteredBairros.length > 0 ? (
@@ -8935,7 +9093,7 @@ function App() {
                 autoFocus
               />
             </div>
-            
+
             <div className="column-filter-content">
               <div className="column-filter-options">
                 {filteredClientes.length > 0 ? (
@@ -9131,7 +9289,7 @@ function App() {
                 autoFocus
               />
             </div>
-            
+
             <div className="column-filter-content">
               <div className="column-filter-options">
                 {filteredEquipamentos.length > 0 ? (
@@ -9190,7 +9348,7 @@ function App() {
                 autoFocus
               />
             </div>
-            
+
             <div className="column-filter-content">
               <div className="column-filter-options">
                 {filteredStatus.length > 0 ? (
@@ -9445,16 +9603,16 @@ function App() {
                   <span className="order-detail-label">Motivo da OS:</span>
                   <div className="order-detail-with-action">
                     <span className="order-detail-value">{order.motivoOS || 'Não informado'}</span>
-                    <button 
+              <button 
                       className="order-detail-defeito-btn"
                       onClick={toggleDefeitoDetails}
                       title={showDefeitoDetails ? "Ocultar detalhes do defeito" : "Ver detalhes do defeito"}
                     >
                       <i className={`bi ${showDefeitoDetails ? 'bi-chevron-up' : 'bi-chevron-down'}`}></i>
                       {showDefeitoDetails ? 'Ocultar defeito' : 'Ver defeito'}
-                    </button>
+              </button>
                   </div>
-                </div>
+            </div>
 
                 {/* Seção expandível dos detalhes do defeito */}
                 {showDefeitoDetails && (
@@ -9614,7 +9772,7 @@ function App() {
                     <span className="order-sidebar-label">Nota Fiscal:</span>
                     <span className="order-sidebar-value">
                       {pedidoDetails?.notaFiscal || 'Não disponível'}
-                    </span>
+                </span>
                   </div>
                 </div>
               </div>
@@ -9643,14 +9801,14 @@ function App() {
                   {loadingTimeline && (
                     <div className="timeline-loading">
                       <i className="bi bi-clock-history"></i> Carregando linha do tempo...
-                    </div>
-                  )}
+              </div>
+            )}
                   
                   {timelineError && (
                     <div className="timeline-error">
                       <i className="bi bi-exclamation-triangle"></i> {timelineError}
-                    </div>
-                  )}
+          </div>
+        )}
                   
                   {timelineData && timelineData.length > 0 && (
                     <div className="timeline-container">
@@ -9805,7 +9963,7 @@ function App() {
       if (condicaoLower.includes('manutenção') || condicaoLower.includes('manutencao')) return 'manutencao';
       if (condicaoLower.includes('substituído') || condicaoLower.includes('substituido')) return 'substituido';
       return '';
-    };
+  };
 
     return (
       <div className={`equipment-sidebar ${isOpen ? 'equipment-sidebar-open' : ''}`}>
@@ -9913,8 +10071,8 @@ function App() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
+          </div>
+        ) : (
                   <div className="equipment-sidebar-no-data">
                     <i className="bi bi-info-circle"></i>
                     <span>Nenhum atendimento encontrado para este equipamento</span>
@@ -10107,7 +10265,7 @@ function App() {
           <div className="city-title-section">
             <span className="city-title">{cidade}</span>
             <span className="city-count">{ordens.length}</span>
-          </div>
+            </div>
           {ordens.length > 1 && (
             <div className="city-actions">
               {someSelected && (
@@ -10180,6 +10338,11 @@ function App() {
     );
   };
 
+  // Se não estiver autenticado, mostrar tela de login
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <>
       <div className={`app ${isInitialLoading ? 'loading' : ''}`}>
@@ -10235,6 +10398,34 @@ function App() {
               </span>
             )}
           </div>
+          
+          {/* Componente de usuário logado */}
+          {currentUser && (
+            <div className="user-info">
+              <button 
+                className="user-button"
+                onClick={() => setShowLogoutMenu(!showLogoutMenu)}
+                title={`Usuário: ${currentUser.name}`}
+              >
+                <i className="bi bi-person-circle"></i>
+                <span className="user-name">{currentUser.name}</span>
+                <i className="bi bi-chevron-down"></i>
+              </button>
+              
+              {showLogoutMenu && (
+                <div className="logout-menu">
+                  <button 
+                    className="logout-option"
+                    onClick={handleLogout}
+                  >
+                    <i className="bi bi-box-arrow-right"></i>
+                    Sair do sistema
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          
           <button 
             className={`config-btn ${showConfigMenu ? 'active' : ''}`}
             onClick={() => setShowConfigMenu(!showConfigMenu)}
@@ -10282,7 +10473,7 @@ function App() {
             connectionTested={connectionTested}
             setConnectionTested={setConnectionTested}
           />
-        </div>
+            </div>
       )}
 
       {showConfigMenu && activeConfigSection === 'process' && (
@@ -10405,7 +10596,7 @@ function App() {
             </div>
 
             <div className="search-container">
-              <input 
+              <input
                 type="text"
                 placeholder="Pesquisar no Kanban..."
                 value={searchTerm}
@@ -10413,7 +10604,7 @@ function App() {
                 className="search-input"
               />
             </div>
-          </div>
+            </div>
 
           <div className="board-section">
             <div className="kanban-board">
@@ -10559,8 +10750,8 @@ function App() {
               {/* Formulário de criação de área */}
               <div className="area-creation">
                 <div className="form-group-inline">
-                  <input
-                    type="text"
+              <input
+                type="text"
                     value={newAreaName}
                     onChange={(e) => {
                       setNewAreaName(e.target.value);
@@ -10595,8 +10786,8 @@ function App() {
                     {createAreaError}
                   </div>
                 )}
-              </div>
-              
+            </div>
+
               <div className="header-divider">|</div>
               
               <button 
@@ -10643,8 +10834,8 @@ function App() {
               <div className="technician-search-container">
                 <div className="search-input-group">
                   <i className="bi bi-search"></i>
-                  <input
-                    type="text"
+              <input
+                type="text"
                     placeholder="Buscar técnico..."
                     value={technicianSearchTerm}
                     onChange={(e) => setTechnicianSearchTerm(e.target.value)}
@@ -10659,8 +10850,8 @@ function App() {
                     </button>
                   )}
                 </div>
-              </div>
-              
+            </div>
+
               <div className="team-column-content">
                 {/* Indicador de carregamento */}
                 {isLoadingTechnicians && (
@@ -10754,7 +10945,7 @@ function App() {
                             <span className="area-tech-count">{getTecnicosByArea(area.id).length}</span>
                           </div>
                           <div className="area-header-actions">
-                            <button 
+              <button 
                               className="btn-delete-area"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -10763,7 +10954,7 @@ function App() {
                               title="Excluir área"
                             >
                               <i className="bi bi-trash"></i>
-                            </button>
+              </button>
                           </div>
                         </div>
                         <div className="area-technicians">
@@ -10798,7 +10989,7 @@ function App() {
                     <span>Nenhuma área cadastrada</span>
                   </div>
                 ) : null}
-              </div>
+            </div>
 
               {/* Coordenadores com suas áreas */}
               <div className="coordinators-section">
@@ -10845,8 +11036,8 @@ function App() {
                               <h4>{coordenador.nome}</h4>
                               <span className="coordinator-stats">
                                 {areas.length} área{areas.length !== 1 ? 's' : ''} • {totalTecnicos} técnico{totalTecnicos !== 1 ? 's' : ''}
-                              </span>
-                            </div>
+                </span>
+              </div>
                           </div>
                         </div>
                         <div className="coordinator-areas">
