@@ -1311,8 +1311,24 @@ body {
 
 .route-column-title-section {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.route-title-with-date {
+  display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.route-forecast-date {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  background-color: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-block;
 }
 
 .route-map-button {
@@ -1363,10 +1379,14 @@ body {
   color: #4a5568;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 12px;
-  min-width: 20px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .route-print-button {

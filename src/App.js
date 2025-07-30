@@ -4088,11 +4088,32 @@ initializeApp();
       
       // Buscar ordens roteirizadas do banco de dados
       const technicianId = validOrders[0]?.TB02115_CODTEC; // Usar o código do técnico da primeira ordem
-      // Usar a data atual, pois o usuário faz a roteirização um dia antes do roteiro
-      const today = new Date();
-      const forecastDate = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
       
-      console.log(`🔍 Buscando ordens roteirizadas para hoje:`, {
+      // Função para calcular a próxima data útil (próximo dia útil, pulando finais de semana)
+      const getNextBusinessDay = (date = new Date()) => {
+        const currentDate = new Date(date);
+        let nextDay = new Date(currentDate);
+        
+        // Avançar para o próximo dia
+        nextDay.setDate(nextDay.getDate() + 1);
+        
+        // Verificar se é fim de semana e pular para segunda-feira
+        const dayOfWeek = nextDay.getDay(); // 0 = Domingo, 6 = Sábado
+        
+        if (dayOfWeek === 0) { // Domingo
+          nextDay.setDate(nextDay.getDate() + 1); // Pular para segunda-feira
+        } else if (dayOfWeek === 6) { // Sábado
+          nextDay.setDate(nextDay.getDate() + 2); // Pular para segunda-feira
+        }
+        
+        return nextDay;
+      };
+      
+      // Usar a próxima data útil, pois o usuário faz a roteirização para o próximo dia útil
+      const nextBusinessDay = getNextBusinessDay();
+      const forecastDate = nextBusinessDay.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      
+      console.log(`🔍 Buscando ordens roteirizadas para a próxima data útil:`, {
         technicianId,
         forecastDate,
         validOrdersCount: validOrders.length
@@ -6810,8 +6831,8 @@ initializeApp();
                 {/* Coluna Esquerda - Ordens não roteirizadas */}
                 <div className="route-column unrouted-column">
                   <div className="route-column-header">
+                    <span className="route-count">{unroutedOrders.length}</span>
                     <div className="route-column-title-section">
-                      <span className="route-count">{unroutedOrders.length}</span>
                       <h3>Não Roteirizadas</h3>
                     </div>
                     <button 
@@ -6919,7 +6940,23 @@ initializeApp();
                 <div className="route-column routed-column">
                   <div className="route-column-header">
                     <span className="route-count">{routedOrders.length}</span>
-                    <h3>Roteirizadas</h3>
+                    <div className="route-column-title-section">
+                      <div className="route-title-with-date">
+                        <h3>Roteirizadas</h3>
+                        {routeData?.forecastDate && (
+                          <span className="route-forecast-date">
+                            {(() => {
+                              // Formatar a data do forecast para exibição brasileira
+                              const forecastDate = new Date(routeData.forecastDate);
+                              const day = forecastDate.getUTCDate().toString().padStart(2, '0');
+                              const month = (forecastDate.getUTCMonth() + 1).toString().padStart(2, '0');
+                              const year = forecastDate.getUTCFullYear();
+                              return `${day}/${month}/${year}`;
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     <button 
                       className="route-print-button"
                       onClick={printRoute}
@@ -7210,7 +7247,7 @@ initializeApp();
                     return (
                       <div className="route-map-info">
                         <span className="route-map-count">
-                          {uniqueLocations} pontos no mapa
+                          {uniqueLocations} pontos no mapa • {unroutedOrders.length} ordens carregadas
                         </span>
                       </div>
                     );
