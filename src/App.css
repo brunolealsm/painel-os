@@ -27,13 +27,18 @@ body {
 /* Header Styles */
 .main-header {
   background: white;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: none;
   padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 60px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 .company-name {
@@ -141,21 +146,28 @@ body {
 
 /* Filters Bar - Positioned right below header */
 .filters-bar {
-  background: transparent;
+  background: white;
   border-bottom: 1px solid #d1d5db;
+  border-top: 1px solid #e2e8f0;
   padding: 8px 24px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
+  position: fixed;
   top: 60px;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  margin-top: 0;
+  box-shadow: none;
 }
 
 /* Board Section */
 .board-section {
-  flex: 1;
-  padding: 24px;
+  margin-top: 95px;
+  padding: 24px 16px 16px 24px;
+  height: calc(100vh - 120px);
+  overflow-y: auto;
 }
 
 .filter-buttons {
@@ -2692,6 +2704,7 @@ body {
     height: auto;
     padding: 16px;
     gap: 16px;
+    top: 0;
   }
   
   .company-name {
@@ -2702,6 +2715,26 @@ body {
     flex-direction: column;
     gap: 16px;
     align-items: stretch;
+    top: auto; /* Ajustar dinamicamente baseado na altura do header */
+  }
+  
+  .board-section {
+    margin-top: auto; /* Ajustar dinamicamente */
+    height: calc(100vh - auto); /* Ajustar dinamicamente */
+  }
+  
+  .team-section {
+    margin-top: auto; /* Ajustar dinamicamente */
+    height: calc(100vh - auto); /* Ajustar dinamicamente */
+  }
+  
+  .config-bar {
+    top: 60px; /* Colado ao header em mobile também */
+  }
+  
+  .config-content {
+    margin-top: 120px; /* 60px header + 60px config-bar */
+    height: calc(100vh - 120px); /* 60px header + 60px config-bar */
   }
   
   .filter-buttons {
@@ -3000,7 +3033,11 @@ body {
   background: white;
   border-bottom: 1px solid #e2e8f0;
   padding: 0 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: fixed;
+  top: 60px; /* 60px header - colado ao header quando configurações estão ativas */
+  left: 0;
+  right: 0;
+  z-index: 998;
 }
 
 .config-nav {
@@ -3032,10 +3069,12 @@ body {
   border-bottom-color: #7c4dff;
 }
 
+/* Config Content */
 .config-content {
-  background: #f8f9fa;
+  margin-top: 120px; /* 60px header + 60px config-bar */
   padding: 24px;
-  border-bottom: 1px solid #e2e8f0;
+  height: calc(100vh - 120px); /* 60px header + 60px config-bar */
+  overflow-y: auto;
 }
 
 /* Formulário de configuração do banco */
@@ -4992,13 +5031,10 @@ body {
 
 /* Seção principal */
 .team-section {
-  padding: 20px;
-  background: #ffffff;
-  border-radius: 8px;
+  margin-top: 120px; /* 60px header + 60px filters */
+  padding: 24px;
   height: calc(100vh - 120px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;
 }
 
 .team-header {
@@ -7936,28 +7972,37 @@ body {
 .user-button {
   display: flex;
   align-items: center;
-  gap: 8px;
   background: none;
   border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  color: #4a5568;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 0;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.user-button:hover {
-  background-color: #f7fafc;
-  color: #2d3748;
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background-color: #f8f9fa;
+  color: #6c757d;
+  border: 1px solid #e9ecef;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
-.user-button i {
-  font-size: 16px;
+.user-button:hover .user-badge {
+  background-color: #e9ecef;
+  color: #495057;
 }
 
-.user-name {
+.user-badge i {
+  font-size: 14px;
+}
+
+.user-badge .user-name {
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -8004,7 +8049,7 @@ body {
 
 /* Responsive adjustments for user info */
 @media (max-width: 768px) {
-  .user-name {
+  .user-badge .user-name {
     max-width: 80px;
   }
   
@@ -8015,12 +8060,12 @@ body {
 }
 
 @media (max-width: 480px) {
-  .user-button {
-    padding: 6px 8px;
-    font-size: 12px;
+  .user-badge {
+    padding: 3px 6px;
+    font-size: 11px;
   }
   
-  .user-name {
+  .user-badge .user-name {
     max-width: 60px;
   }
   

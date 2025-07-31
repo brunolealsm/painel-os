@@ -10665,13 +10665,28 @@ initializeApp();
                 onClick={() => setShowLogoutMenu(!showLogoutMenu)}
                 title={`Usuário: ${currentUser.name || currentUser.username || 'Usuário'}`}
               >
-                <i className="bi bi-person-circle"></i>
-                <span className="user-name">{currentUser.name || currentUser.username || 'Usuário'}</span>
-                <i className="bi bi-chevron-down"></i>
+                <span className="user-badge">
+                  <i className="bi bi-person-circle"></i>
+                  <span className="user-name">{currentUser.name || currentUser.username || 'Usuário'}</span>
+                  <i className="bi bi-chevron-down"></i>
+                </span>
               </button>
               
               {showLogoutMenu && (
                 <div className="logout-menu">
+                  {/* Opção Configurações - apenas para administradores */}
+                  {currentUser && currentUser.type === '1' && (
+                    <button 
+                      className="logout-option"
+                      onClick={() => {
+                        setShowConfigMenu(true);
+                        setShowLogoutMenu(false);
+                      }}
+                    >
+                      <i className="bi bi-gear"></i>
+                      Configurações
+                    </button>
+                  )}
                   <button 
                     className="logout-option"
                     onClick={handleLogout}
@@ -10682,17 +10697,6 @@ initializeApp();
                 </div>
               )}
             </div>
-          )}
-          
-          {/* Botão de configurações - apenas para administradores */}
-          {currentUser && currentUser.type === '1' && (
-            <button 
-              className={`config-btn ${showConfigMenu ? 'active' : ''}`}
-              onClick={() => setShowConfigMenu(!showConfigMenu)}
-              title="Configurações"
-            >
-              ⚙️
-            </button>
           )}
         </div>
       </header>
