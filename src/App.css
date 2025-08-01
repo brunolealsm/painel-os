@@ -8075,3 +8075,618 @@ body {
   }
 }
 
+/* Modal do Roteiro de Hoje */
+.today-route-modal {
+  max-width: 1200px;
+  width: 95vw;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.today-route-modal .modal-header {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.today-route-modal .modal-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.today-route-modal .modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.today-route-modal .modal-close:hover {
+  background: #e2e8f0;
+}
+
+.today-route-modal .modal-close i {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.today-route-modal .modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.route-section {
+  margin-bottom: 32px;
+}
+
+.route-section:last-child {
+  margin-bottom: 0;
+}
+
+.route-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 16px;
+  margin-left: 8px;
+}
+
+.route-section-title i {
+  color: #6b7280;
+}
+
+.route-section-title .record-counter {
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.route-section-title .total-time-text {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+  margin-left: 12px;
+}
+
+.route-orders-list {
+  /* Removed padding to allow orders to appear directly on modal background */
+}
+
+/* Tabelas modernas para o modal de roteiro */
+.route-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.route-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: white;
+}
+
+.route-table thead {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.route-table th {
+  padding: 12px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.route-table td {
+  padding: 6px 8px; /* Reduced from 7px to 6px (10% decrease) */
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 0;
+}
+
+.route-table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.route-table tbody tr:hover {
+  background-color: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.route-table-row.open {
+  border-left: 4px solid #3182ce;
+}
+
+.route-table-row.completed {
+  border-left: 4px solid #38a169;
+}
+
+.route-table-row.open:hover {
+  background-color: #ebf8ff !important;
+}
+
+.route-table-row.completed:hover {
+  background-color: #f0fff4 !important;
+}
+
+/* Estilos específicos para colunas da tabela */
+.route-table .order-number {
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 60px;
+  text-align: center;
+}
+
+.route-table .order-os {
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 120px;
+}
+
+.route-table .order-cliente {
+  min-width: 150px;
+  max-width: 200px;
+  cursor: help;
+}
+
+.route-table .order-equipamento {
+  min-width: 150px;
+  max-width: 200px;
+  cursor: help;
+}
+
+.route-table .order-serie {
+  min-width: 120px;
+  max-width: 150px;
+}
+
+.route-table .order-previsao {
+  min-width: 60px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.route-table .order-condicao {
+  min-width: 100px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.route-table .order-horario {
+  min-width: 120px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.route-table .order-tempo {
+  min-width: 80px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.route-table .order-actions {
+  min-width: 120px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.route-table .order-actions .btn-parts,
+.route-table .order-actions .btn-details {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  min-height: 24px;
+  justify-content: center;
+}
+
+/* Tool icon for pending parts */
+.route-table .order-actions .btn-parts.has-pending {
+  padding: 2px;
+  background: none;
+  border: none;
+  color: #e53e3e;
+  cursor: help;
+  position: relative;
+  min-height: 20px;
+  min-width: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.route-table .order-actions .btn-parts.has-pending:hover {
+  background: rgba(229, 62, 62, 0.1);
+  border-radius: 4px;
+}
+
+.route-table .order-actions .btn-parts.has-pending i {
+  font-size: 12px;
+}
+
+.route-table .order-actions .btn-parts {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.route-table .order-actions .btn-parts:hover {
+  background: #fde68a;
+  transform: translateY(-1px);
+}
+
+.route-table .order-actions .btn-details {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.route-table .order-actions .btn-details:hover {
+  background: #bfdbfe;
+  transform: translateY(-1px);
+}
+
+.route-table .order-actions i {
+  font-size: 10px;
+}
+
+.route-order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.route-order-item:hover {
+  border-color: #cbd5e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.route-order-item.open {
+  border-left: 4px solid #3182ce;
+}
+
+.route-order-item.completed {
+  border-left: 4px solid #38a169;
+}
+
+.order-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  font-size: 13px;
+  color: #4a5568;
+}
+
+.order-number {
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 60px;
+}
+
+.order-os {
+  font-weight: 600;
+  color: #2d3748;
+  min-width: 120px;
+}
+
+.order-cliente {
+  flex: 1;
+  min-width: 150px;
+  cursor: help;
+}
+
+.order-equipamento {
+  flex: 1;
+  min-width: 150px;
+  cursor: help;
+}
+
+.order-serie {
+  min-width: 120px;
+}
+
+.order-previsao {
+  min-width: 60px;
+  text-align: center;
+}
+
+.order-condicao {
+  min-width: 100px;
+  font-weight: 500;
+}
+
+.order-horario {
+  min-width: 120px;
+  text-align: center;
+}
+
+.order-tempo {
+  min-width: 80px;
+  text-align: center;
+}
+
+.order-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.btn-parts,
+.btn-details {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-parts {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.btn-parts:hover {
+  background: #feb2b2;
+}
+
+.btn-details {
+  background: #e6fffa;
+  color: #2c7a7b;
+}
+
+.btn-details:hover {
+  background: #b2f5ea;
+}
+
+.btn-parts i,
+.btn-details i {
+  font-size: 11px;
+}
+
+/* Sidebar de Detalhes */
+.details-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: white;
+  border-left: 1px solid #e2e8f0;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8f9fa;
+}
+
+.sidebar-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.sidebar-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-close:hover {
+  background: #e2e8f0;
+}
+
+.sidebar-close i {
+  font-size: 16px;
+  color: #6b7280;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.details-section {
+  margin-bottom: 24px;
+}
+
+.details-section:last-child {
+  margin-bottom: 0;
+}
+
+.details-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.details-section p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #4a5568;
+  margin: 0;
+}
+
+.counters-table,
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.counters-table th,
+.counters-table td,
+.parts-table th,
+.parts-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.counters-table th,
+.parts-table th {
+  background: #f8f9fa;
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 12px;
+}
+
+.counters-table td,
+.parts-table td {
+  color: #4a5568;
+}
+
+.counters-table tbody tr:last-child td,
+.parts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.counters-table tbody tr:hover,
+.parts-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .today-route-modal {
+    width: 98vw;
+    max-height: 95vh;
+    max-width: none;
+  }
+
+  .route-table-container {
+    overflow-x: auto;
+    margin: 0 -8px;
+  }
+
+  .route-table {
+    font-size: 11px;
+    min-width: 800px;
+  }
+
+  .route-table th,
+  .route-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .route-table .order-actions .btn-parts,
+  .route-table .order-actions .btn-details {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  .route-table .order-actions i {
+    font-size: 9px;
+  }
+  
+  .order-info {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .order-number,
+  .order-os,
+  .order-cliente,
+  .order-equipamento,
+  .order-serie,
+  .order-previsao,
+  .order-condicao,
+  .order-horario,
+  .order-tempo {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .order-actions {
+    margin-left: 0;
+    margin-top: 8px;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .details-sidebar {
+    width: 100vw;
+  }
+}
+

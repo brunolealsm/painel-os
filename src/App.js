@@ -1189,6 +1189,9 @@ function App() {
   const [showTechnicianMenu, setShowTechnicianMenu] = useState({});
   const [technicianMenuPositions, setTechnicianMenuPositions] = useState({});
   
+  // Estados para modal do roteiro de hoje
+  const [showTodayRouteModal, setShowTodayRouteModal] = useState({});
+  
   // Estados para o modal de rota
   const [showRouteModal, setShowRouteModal] = useState(false);
   const [routeModalData, setRouteModalData] = useState(null);
@@ -5608,20 +5611,352 @@ initializeApp();
                   <div 
                     className="technician-menu-option"
                     onClick={() => {
-                      // Função para impressão de roteiro
-                      console.log(`Impressão de roteiro para ${technician}`);
-                      alert(`Impressão de roteiro para ${technician} - Função em desenvolvimento`);
+                      // Função para roteiro de hoje
+                      console.log(`Roteiro de hoje para ${technician}`);
                       setShowTechnicianMenu(prev => ({ ...prev, [technician]: false }));
+                      setShowTodayRouteModal(prev => ({ ...prev, [technician]: true }));
                     }}
                   >
-                    <i className="bi bi-printer"></i>
-                    <span>Impressão de roteiro</span>
+                    <i className="bi bi-calendar-day"></i>
+                    <span>Roteiro de hoje</span>
                   </div>
                 </div>
               </div>
             </div>
           );
         })}
+      </>
+    );
+  };
+
+  // Componente do modal do roteiro de hoje
+  const TodayRouteModal = ({ technician, isOpen, onClose }) => {
+    // Estados para o sidebar de detalhes
+    const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
+    const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+
+    // Função para calcular o tempo total das ordens concluídas
+    const calculateTotalTime = (orders) => {
+      let totalMinutes = 0;
+      
+      orders.forEach(order => {
+        const timeStr = order.tempo;
+        if (timeStr) {
+          // Extrair horas e minutos do formato "1h15min" ou "45min"
+          const hourMatch = timeStr.match(/(\d+)h/);
+          const minuteMatch = timeStr.match(/(\d+)min/);
+          
+          const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
+          const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
+          
+          totalMinutes += hours * 60 + minutes;
+        }
+      });
+      
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      
+      if (totalHours > 0 && remainingMinutes > 0) {
+        return `${totalHours}h ${remainingMinutes}min`;
+      } else if (totalHours > 0) {
+        return `${totalHours}h`;
+      } else {
+        return `${remainingMinutes}min`;
+      }
+    };
+
+    // Dados mock para teste visual
+    const mockOpenOrders = [
+      {
+        id: 1,
+        orderNumber: "OS001",
+        os: "OS-2024-001",
+        cliente: "Empresa ABC Ltda",
+        endereco: "Rua das Flores, 123 - Centro - São Paulo/SP",
+        equipamento: "Impressora HP LaserJet Pro",
+        motivoOS: "Manutenção preventiva mensal",
+        seriePatrimonio: "SN123456 / PAT789",
+        previsao: "09:00"
+      },
+      {
+        id: 2,
+        orderNumber: "OS002",
+        os: "OS-2024-002",
+        cliente: "Comércio XYZ",
+        endereco: "Av. Principal, 456 - Vila Nova - São Paulo/SP",
+        equipamento: "Multifuncional Canon",
+        motivoOS: "Substituição de toner",
+        seriePatrimonio: "SN789012 / PAT456",
+        previsao: "10:30"
+      }
+    ];
+
+    const mockCompletedOrders = [
+      {
+        id: 3,
+        os: "OS-2024-003",
+        cliente: "Escritório Central",
+        endereco: "Rua do Comércio, 789 - Centro - São Paulo/SP",
+        equipamento: "Scanner Epson",
+        motivoOS: "Configuração de rede",
+        seriePatrimonio: "SN345678 / PAT123",
+        condicao: "Funcionando",
+        horarioInicial: "08:00",
+        horarioFinal: "09:15",
+        tempo: "1h15min",
+        hasPendingParts: true,
+        laudo: "Equipamento funcionando normalmente após configuração da rede. Cliente satisfeito com o serviço.",
+        contadores: {
+          pb: 1250,
+          cor: 890,
+          dig: 2340,
+          a3pb: 156,
+          a3cor: 89
+        },
+        pecasPendentes: [
+          { codigo: "TON001", nome: "Toner Preto", quantidade: 2 },
+          { codigo: "TON002", nome: "Toner Colorido", quantidade: 1 }
+        ],
+        pecasTrocadas: [
+          { codigo: "ROL001", nome: "Rolo de Transferência", quantidade: 1 }
+        ]
+      },
+      {
+        id: 4,
+        os: "OS-2024-004",
+        cliente: "Loja de Informática",
+        endereco: "Shopping Center, Loja 45 - São Paulo/SP",
+        equipamento: "Impressora Térmica",
+        motivoOS: "Limpeza e manutenção",
+        seriePatrimonio: "SN567890 / PAT321",
+        condicao: "Funcionando",
+        horarioInicial: "11:00",
+        horarioFinal: "11:45",
+        tempo: "45min",
+        hasPendingParts: false,
+        laudo: "Equipamento limpo e funcionando perfeitamente. Nenhuma peça necessária.",
+        contadores: {
+          pb: 0,
+          cor: 0,
+          dig: 0,
+          a3pb: 0,
+          a3cor: 0
+        },
+        pecasPendentes: [],
+        pecasTrocadas: []
+      }
+    ];
+
+    const handleShowDetails = (order) => {
+      setSelectedOrderDetails(order);
+      setShowDetailsSidebar(true);
+    };
+
+    const handleCloseDetails = () => {
+      setShowDetailsSidebar(false);
+      setSelectedOrderDetails(null);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+      <>
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal-content today-route-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Roteiro de Hoje - {technician}</h2>
+              <button className="modal-close" onClick={onClose}>
+                <i className="bi bi-x"></i>
+              </button>
+            </div>
+            
+            <div className="modal-body">
+              {/* Tabela Em Aberto */}
+              <div className="route-section">
+                <h3 className="route-section-title">
+                  <i className="bi bi-clock"></i>
+                  Em aberto
+                  <span className="record-counter">{mockOpenOrders.length}</span>
+                </h3>
+                <div className="route-table-container">
+                  <table className="route-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>OS</th>
+                        <th>Cliente</th>
+                        <th>Equipamento</th>
+                        <th>Série/Patrimônio</th>
+                        <th>Previsão</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mockOpenOrders.map(order => (
+                        <tr key={order.id} className="route-table-row open">
+                          <td className="order-number">#{order.orderNumber}</td>
+                          <td className="order-os">{order.os}</td>
+                          <td className="order-cliente" title={order.endereco}>{order.cliente}</td>
+                          <td className="order-equipamento" title={order.motivoOS}>{order.equipamento}</td>
+                          <td className="order-serie">{order.seriePatrimonio}</td>
+                          <td className="order-previsao">{order.previsao}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Tabela Concluídas */}
+              <div className="route-section">
+                <h3 className="route-section-title">
+                  <i className="bi bi-check-circle"></i>
+                  Concluídas
+                  <span className="record-counter">{mockCompletedOrders.length}</span>
+                  <span className="total-time-text">Tempo produzido: {calculateTotalTime(mockCompletedOrders)}</span>
+                </h3>
+                <div className="route-table-container">
+                  <table className="route-table">
+                    <thead>
+                      <tr>
+                        <th>OS</th>
+                        <th>Cliente</th>
+                        <th>Equipamento</th>
+                        <th>Série/Patrimônio</th>
+                        <th>Condição</th>
+                        <th>Horário</th>
+                        <th>Tempo</th>
+                        <th>Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mockCompletedOrders.map(order => (
+                        <tr key={order.id} className="route-table-row completed">
+                          <td className="order-os">{order.os}</td>
+                          <td className="order-cliente" title={order.endereco}>{order.cliente}</td>
+                          <td className="order-equipamento" title={order.motivoOS}>{order.equipamento}</td>
+                          <td className="order-serie">{order.seriePatrimonio}</td>
+                          <td className="order-condicao">{order.condicao}</td>
+                          <td className="order-horario">{order.horarioInicial} - {order.horarioFinal}</td>
+                          <td className="order-tempo">{order.tempo}</td>
+                          <td className="order-actions">
+                            {order.hasPendingParts && (
+                              <button className="btn-parts has-pending" title="Peças pendentes">
+                                <i className="bi bi-tools"></i>
+                              </button>
+                            )}
+                            <button 
+                              className="btn-details"
+                              onClick={() => handleShowDetails(order)}
+                              title="Ver detalhes"
+                            >
+                              <i className="bi bi-info-circle"></i>
+                              Detalhes
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar de Detalhes */}
+        {showDetailsSidebar && selectedOrderDetails && (
+          <div className="details-sidebar">
+            <div className="sidebar-header">
+              <h3>Detalhes da OS {selectedOrderDetails.os}</h3>
+              <button className="sidebar-close" onClick={handleCloseDetails}>
+                <i className="bi bi-x"></i>
+              </button>
+            </div>
+            
+            <div className="sidebar-content">
+              {/* Laudo */}
+              <div className="details-section">
+                <h4>Laudo</h4>
+                <p>{selectedOrderDetails.laudo}</p>
+              </div>
+
+              {/* Contadores */}
+              <div className="details-section">
+                <h4>Contadores</h4>
+                <table className="counters-table">
+                  <thead>
+                    <tr>
+                      <th>P&B</th>
+                      <th>Cor</th>
+                      <th>Dig.</th>
+                      <th>A3 P&B</th>
+                      <th>A3 Cor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{selectedOrderDetails.contadores.pb}</td>
+                      <td>{selectedOrderDetails.contadores.cor}</td>
+                      <td>{selectedOrderDetails.contadores.dig}</td>
+                      <td>{selectedOrderDetails.contadores.a3pb}</td>
+                      <td>{selectedOrderDetails.contadores.a3cor}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Peças Pendentes */}
+              {selectedOrderDetails.pecasPendentes.length > 0 && (
+                <div className="details-section">
+                  <h4>Peças Pendentes</h4>
+                  <table className="parts-table">
+                    <thead>
+                      <tr>
+                        <th>Código</th>
+                        <th>Nome</th>
+                        <th>Quantidade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrderDetails.pecasPendentes.map((peca, index) => (
+                        <tr key={index}>
+                          <td>{peca.codigo}</td>
+                          <td>{peca.nome}</td>
+                          <td>{peca.quantidade}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Peças Trocadas */}
+              {selectedOrderDetails.pecasTrocadas.length > 0 && (
+                <div className="details-section">
+                  <h4>Peças Trocadas</h4>
+                  <table className="parts-table">
+                    <thead>
+                      <tr>
+                        <th>Código</th>
+                        <th>Nome</th>
+                        <th>Quantidade</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrderDetails.pecasTrocadas.map((peca, index) => (
+                        <tr key={index}>
+                          <td>{peca.codigo}</td>
+                          <td>{peca.nome}</td>
+                          <td>{peca.quantidade}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </>
     );
   };
@@ -11517,6 +11852,20 @@ initializeApp();
       
       {/* Renderizar todos os modais de menu de técnicos */}
       <TechnicianMenuModals />
+
+      {/* Modal do roteiro de hoje */}
+      {Object.entries(showTodayRouteModal).map(([technician, isOpen]) => {
+        if (!isOpen) return null;
+        
+        return (
+          <TodayRouteModal
+            key={technician}
+            technician={technician}
+            isOpen={isOpen}
+            onClose={() => setShowTodayRouteModal(prev => ({ ...prev, [technician]: false }))}
+          />
+        );
+      })}
 
       {/* Modal de rota do técnico */}
       <RouteModal 
