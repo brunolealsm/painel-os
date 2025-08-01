@@ -2912,23 +2912,59 @@ initializeApp();
     }
   }, [selectedFilterItems.coordenador, selectedFilterItems.area, selectedFilterItems.tecnico, teamData, technicianDataCache, technicianNameToIdMap]);
 
+  // Função para verificar se uma ordem corresponde ao termo de busca
+  const orderMatchesSearch = (order, searchTerm) => {
+    if (!searchTerm || searchTerm.trim() === '') return true;
+    
+    const term = searchTerm.toLowerCase().trim();
+    
+    // Campos para buscar na ordem
+    const searchFields = [
+      order.id || '',
+      order.TB02115_OS || '',
+      order.cliente || order.TB01008_NOME || '',
+      order.TB02115_BAIRRO || '',
+      order.TB02115_EQUIPAMENTO || '',
+      order.TB02115_SERIE || '',
+      order.TB02115_PATRIMONIO || '',
+      order.TB02115_MOTIVO || '',
+      order.tipo || getServiceTypeFromPreventiva(order.TB02115_PREVENTIVA) || '',
+      order.sla || getSLAFromCalcRestante(order.CALC_RESTANTE) || ''
+    ];
+    
+    return searchFields.some(field => 
+      field.toString().toLowerCase().includes(term)
+    );
+  };
+
+  // Função para filtrar ordens por busca (aplicável tanto para "Em Aberto" quanto para técnicos)
+  const filterOrdersBySearch = (orders, searchTerm) => {
+    if (!searchTerm || searchTerm.trim() === '') return orders;
+    
+    return orders.filter(order => orderMatchesSearch(order, searchTerm));
+  };
+
+
+
   const getFilteredOrders = React.useMemo(() => {
     console.log('🔍 getFilteredOrders - availableOrdersState:', availableOrdersState);
     console.log('🔍 getFilteredOrders - showOnlyLate:', showOnlyLate);
+    console.log('🔍 getFilteredOrders - searchTerm:', searchTerm);
     
     const filtered = availableOrdersState
       .filter(item => item.cidade && item.cidade.trim() !== '') // Garantir que tem cidade
       .map(item => ({
         ...item,
-        ordens: showOnlyLate 
+        ordens: (showOnlyLate 
           ? item.ordens.filter(ordem => ordem.CALC_RESTANTE <= 24) // Usar CALC_RESTANTE para filtrar atrasadas
           : item.ordens
+        ).filter(ordem => orderMatchesSearch(ordem, searchTerm)) // Aplicar filtro de busca
       }))
       .filter(item => item.ordens.length > 0);
     
     console.log('🔍 getFilteredOrders - resultado filtrado:', filtered);
     return filtered;
-  }, [availableOrdersState, showOnlyLate]);
+  }, [availableOrdersState, showOnlyLate, searchTerm]);
 
   const getGroupedByCity = React.useMemo(() => {
     const filtered = getFilteredOrders;
@@ -3048,6 +3084,8 @@ initializeApp();
     console.log('🔍 getGroupedByCity - resultado final:', result);
     return result;
   }, [getFilteredOrders, dataSource, selectedColumnFilters]);
+
+
 
 
 
@@ -5315,20 +5353,37 @@ initializeApp();
   // Função para aplicar filtros de técnico (memoizada)
   const getFilteredTechnicianGroups = React.useCallback((technician) => {
     if (!technicianGroups[technician] || !technicianFilters[technician]) {
-      return technicianGroups[technician] || {};
+      // Aplicar apenas o filtro de busca quando não há filtros de técnico
+      const technicianData = technicianGroups[technician] || {};
+      const filteredData = {};
+      Object.keys(technicianData).forEach(groupName => {
+        const filteredOrders = filterOrdersBySearch(technicianData[groupName], searchTerm);
+        if (filteredOrders.length > 0) {
+          filteredData[groupName] = filteredOrders;
+        }
+      });
+      return filteredData;
     }
 
     const filtered = {};
     Object.entries(technicianGroups[technician]).forEach(([groupName, orders]) => {
       // "Em serviço" sempre aparece
       if (groupName === 'Em serviço') {
-        filtered[groupName] = orders;
+        filtered[groupName] = filterOrdersBySearch(orders, searchTerm);
       } else if (technicianFilters[technician][groupName]) {
-        filtered[groupName] = orders;
+        filtered[groupName] = filterOrdersBySearch(orders, searchTerm);
       }
     });
+    
+    // Remover grupos vazios após aplicar o filtro de busca
+    Object.keys(filtered).forEach(groupName => {
+      if (filtered[groupName].length === 0) {
+        delete filtered[groupName];
+      }
+    });
+    
     return filtered;
-  }, [technicianGroups, technicianFilters]);
+  }, [technicianGroups, technicianFilters, searchTerm]);
 
   // Função para contar filtros ativos (memoizada)
   const getActiveTechnicianFiltersCount = React.useCallback((technician) => {
@@ -11200,7 +11255,7 @@ initializeApp();
             <div className="search-container">
               <input
                 type="text"
-                placeholder="Pesquisar no Kanban..."
+                placeholder="Pesquisar ordens de serviço..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="search-input"
