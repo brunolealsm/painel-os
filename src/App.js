@@ -2336,7 +2336,7 @@ initializeApp();
     return {
       id: ordem.TB02115_CODIGO,
       cliente: ordem.TB01008_NOME,
-      equipamento: ordem.TB01010_NOME,
+      equipamento: ordem.TB01010_RESUMIDO || ordem.TB01010_NOME,
       tipo: getServiceTypeFromPreventiva(ordem.TB02115_PREVENTIVA),
       sla: getSLAFromCalcRestante(ordem.CALC_RESTANTE),
       atrasada: ordem.CALC_RESTANTE <= 24,
@@ -2924,7 +2924,7 @@ initializeApp();
       order.TB02115_OS || '',
       order.cliente || order.TB01008_NOME || '',
       order.TB02115_BAIRRO || '',
-      order.TB02115_EQUIPAMENTO || '',
+      order.TB02115_EQUIPAMENTO || order.TB01010_RESUMIDO || order.TB01010_NOME || '',
       order.TB02115_SERIE || '',
       order.TB02115_PATRIMONIO || '',
       order.TB02115_MOTIVO || '',
@@ -3064,7 +3064,7 @@ initializeApp();
       result = result.map(group => ({
         ...group,
         ordens: group.ordens.filter(ordem => {
-          const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+          const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
           return selectedColumnFilters.equipamento.includes(equipamento);
         })
       })).filter(group => group.ordens.length > 0); // Remover grupos sem ordens
@@ -5689,6 +5689,29 @@ initializeApp();
     // Estados para o sidebar de detalhes
     const [showDetailsSidebar, setShowDetailsSidebar] = useState(false);
     const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
+    
+    // Estados para dados reais da API
+    const [routeData, setRouteData] = useState([]);
+    const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+    const [routeError, setRouteError] = useState(null);
+    
+    // Estados para ordens concluídas
+    const [completedData, setCompletedData] = useState([]);
+    const [isLoadingCompleted, setIsLoadingCompleted] = useState(false);
+    const [completedError, setCompletedError] = useState(null);
+    
+    // Estados para reordenação
+    const [draggedItem, setDraggedItem] = useState(null);
+    const [showSequenceInput, setShowSequenceInput] = useState(null);
+    const [sequenceInputValue, setSequenceInputValue] = useState('');
+    const [isReordering, setIsReordering] = useState(false);
+    
+    // Estados para modal de detalhes
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedCompletedOrder, setSelectedCompletedOrder] = useState(null);
+    const [pendingParts, setPendingParts] = useState([]);
+    const [usedParts, setUsedParts] = useState([]);
+    const [isLoadingParts, setIsLoadingParts] = useState(false);
 
     // Função para calcular o tempo total das ordens concluídas
     const calculateTotalTime = (orders) => {
@@ -5718,6 +5741,502 @@ initializeApp();
       } else {
         return `${remainingMinutes}min`;
       }
+    };
+
+    // Função para buscar dados da API
+    const fetchTodayRoute = React.useCallback(async () => {
+      if (!technician || !isOpen) return;
+      
+      try {
+        setIsLoadingRoute(true);
+        setRouteError(null);
+        
+        // Obter ID do técnico do mapeamento
+        const technicianId = getTechnicianIdByName(technician);
+        if (!technicianId) {
+          throw new Error(`ID do técnico ${technician} não encontrado`);
+        }
+        
+        console.log(`🔄 Buscando roteiro de hoje para técnico ${technician} (ID: ${technicianId})`);
+        console.log(`🔍 URL completa: ${API_BASE_URL}/api/orders/today-route/${technicianId}`);
+        
+        // Teste de conectividade com o backend
+        try {
+          const testResponse = await fetch(`${API_BASE_URL}/api/config/process`);
+          console.log(`🧪 Teste de conectividade - Status: ${testResponse.status}`);
+        } catch (testError) {
+          console.error('🧪 Erro no teste de conectividade:', testError);
+        }
+        
+        const response = await fetch(`${API_BASE_URL}/api/orders/today-route/${technicianId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000 // 30 segundos de timeout
+        });
+        console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Resposta de erro da API: ${errorText}`);
+          throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log(`📊 Dados recebidos da API:`, data);
+        
+        if (!data.success) {
+          throw new Error(data.message || 'Erro ao buscar roteiro');
+        }
+        
+        setRouteData(data.data || []);
+        console.log(`✅ ${data.data.length} ordens carregadas para roteiro de hoje`);
+        
+      } catch (error) {
+        console.error('❌ Erro ao buscar roteiro de hoje:', error);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Tipo do erro:', error.constructor.name);
+        
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
+        }
+        
+        setRouteError(errorMessage);
+      } finally {
+        setIsLoadingRoute(false);
+      }
+    }, [technician, isOpen, getTechnicianIdByName]);
+
+    // Função para buscar ordens concluídas
+    const fetchCompletedRoute = useCallback(async () => {
+      try {
+        setIsLoadingCompleted(true);
+        setCompletedError(null);
+        
+        // Obter ID do técnico
+        const technicianId = getTechnicianIdByName(technician);
+        if (!technicianId) {
+          throw new Error(`ID do técnico ${technician} não encontrado`);
+        }
+        
+        console.log('🔄 Buscando ordens concluídas para técnico:', technicianId);
+        console.log(`🔍 URL completa: ${API_BASE_URL}/api/orders/completed-route/${technicianId}`);
+        
+        const response = await fetch(`${API_BASE_URL}/api/orders/completed-route/${technicianId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000 // 30 segundos de timeout
+        });
+        console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Resposta de erro da API: ${errorText}`);
+          throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log(`📊 Dados recebidos da API:`, result);
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Erro ao buscar ordens concluídas');
+        }
+        
+        console.log('✅ Ordens concluídas carregadas:', result.data);
+        setCompletedData(result.data || []);
+        
+      } catch (error) {
+        console.error('❌ Erro ao buscar ordens concluídas:', error);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Tipo do erro:', error.constructor.name);
+        
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
+        }
+        
+        setCompletedError(errorMessage);
+        setCompletedData([]);
+      } finally {
+        setIsLoadingCompleted(false);
+      }
+    }, [technician, getTechnicianIdByName]);
+
+    // Função para calcular tempo de atendimento
+    const calculateAttendanceTime = (horaInicial, horaFinal) => {
+      if (!horaInicial || !horaFinal) {
+        console.log('⚠️ Horários vazios:', { horaInicial, horaFinal });
+        return 'N/A';
+      }
+      
+      try {
+        console.log('🔄 Calculando tempo para:', { horaInicial, horaFinal });
+        
+        // Se for string de hora (hh:mm), converter para minutos
+        const parseTimeString = (timeStr) => {
+          console.log('🔍 Analisando string:', timeStr, typeof timeStr);
+          
+          if (typeof timeStr === 'string' && timeStr.includes(':')) {
+            const [hours, minutes] = timeStr.split(':').map(Number);
+            const totalMinutes = hours * 60 + minutes;
+            console.log(`  ✅ String de hora: ${timeStr} = ${totalMinutes} minutos`);
+            return totalMinutes;
+          }
+          
+          // Se for date/datetime, extrair a hora
+          const date = new Date(timeStr);
+          if (!isNaN(date.getTime())) {
+            const totalMinutes = date.getHours() * 60 + date.getMinutes();
+            console.log(`  ✅ Data/hora: ${timeStr} = ${totalMinutes} minutos`);
+            return totalMinutes;
+          }
+          
+          console.log(`  ❌ Formato não reconhecido: ${timeStr}`);
+          return null;
+        };
+
+        const inicioMinutos = parseTimeString(horaInicial);
+        const fimMinutos = parseTimeString(horaFinal);
+        
+        if (inicioMinutos === null || fimMinutos === null) {
+          console.log('❌ Falha ao parsear horários');
+          return 'N/A';
+        }
+        
+        let diffMinutes = fimMinutos - inicioMinutos;
+        console.log(`⏱️ Diferença inicial: ${diffMinutes} minutos`);
+        
+        // Se a diferença for negativa, assumir que passou da meia-noite
+        if (diffMinutes < 0) {
+          diffMinutes += 24 * 60; // Adicionar 24 horas
+          console.log(`🌙 Passou da meia-noite, nova diferença: ${diffMinutes} minutos`);
+        }
+        
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        
+        // Formato solicitado: hh:mm
+        const result = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        console.log(`✅ Tempo calculado: ${result}`);
+        
+        return result;
+        
+      } catch (error) {
+        console.error('❌ Erro ao calcular tempo:', error);
+        return 'N/A';
+      }
+    };
+
+    // Função para formatar horário
+    const formatTime = (dateTime) => {
+      if (!dateTime) {
+        console.log('⚠️ formatTime: valor vazio');
+        return 'N/A';
+      }
+      
+      try {
+        console.log('🕐 formatTime input:', dateTime, typeof dateTime);
+        
+        // Se já for uma string de hora (hh:mm), retornar como está
+        if (typeof dateTime === 'string' && dateTime.match(/^\d{2}:\d{2}$/)) {
+          console.log('✅ formatTime: já é string hh:mm');
+          return dateTime;
+        }
+        
+        // Se for date/datetime, extrair a hora
+        const date = new Date(dateTime);
+        if (!isNaN(date.getTime())) {
+          const result = date.toLocaleTimeString('pt-BR', {
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          console.log('✅ formatTime: extraído de date:', result);
+          return result;
+        }
+        
+        console.log('❌ formatTime: formato não reconhecido');
+        return 'N/A';
+      } catch (error) {
+        console.error('❌ Erro ao formatar horário:', error);
+        return 'N/A';
+      }
+    };
+
+    // Função para calcular tempo total das ordens concluídas
+    const calculateTotalCompletedTime = (orders) => {
+      if (!orders || orders.length === 0) return '00:00';
+      
+      console.log(`📊 Calculando tempo total para ${orders.length} ordens concluídas`);
+      
+      let totalMinutes = 0;
+      
+      orders.forEach(ordem => {
+        const tempoStr = calculateAttendanceTime(ordem.TB02122_HORAINI, ordem.TB02122_HORAFIM);
+        console.log(`⏱️ Ordem ${ordem.TB02122_NUMOS}: ${tempoStr}`);
+        
+        if (tempoStr !== 'N/A' && tempoStr.includes(':')) {
+          const [hours, minutes] = tempoStr.split(':').map(Number);
+          const orderMinutes = hours * 60 + minutes;
+          totalMinutes += orderMinutes;
+          console.log(`  ➕ Adicionando ${orderMinutes} minutos (total: ${totalMinutes})`);
+        }
+      });
+      
+      const totalHours = Math.floor(totalMinutes / 60);
+      const remainingMinutes = totalMinutes % 60;
+      const result = `${totalHours.toString().padStart(2, '0')}:${remainingMinutes.toString().padStart(2, '0')}`;
+      
+      console.log(`🕰️ Tempo total calculado: ${result} (${totalMinutes} minutos)`);
+      
+      return result;
+    };
+
+    // Função para buscar peças (pendentes e utilizadas)
+    const fetchOrderParts = async (orderNumber) => {
+      try {
+        setIsLoadingParts(true);
+        
+        const [pendingResponse, usedResponse] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/orders/${orderNumber}/pending-parts`),
+          fetch(`${API_BASE_URL}/api/orders/${orderNumber}/used-parts`)
+        ]);
+        
+        const pendingResult = await pendingResponse.json();
+        const usedResult = await usedResponse.json();
+        
+        setPendingParts(pendingResult.success ? pendingResult.data : []);
+        setUsedParts(usedResult.success ? usedResult.data : []);
+        
+      } catch (error) {
+        console.error('❌ Erro ao buscar peças:', error);
+        setPendingParts([]);
+        setUsedParts([]);
+      } finally {
+        setIsLoadingParts(false);
+      }
+    };
+
+    // Função para abrir modal de detalhes
+    const openDetailsModal = (order) => {
+      setSelectedCompletedOrder(order);
+      setShowDetailsModal(true);
+      fetchOrderParts(order.TB02122_NUMOS);
+    };
+
+    // Função para fechar modal de detalhes
+    const closeDetailsModal = () => {
+      setShowDetailsModal(false);
+      setSelectedCompletedOrder(null);
+      setPendingParts([]);
+      setUsedParts([]);
+    };
+
+    // Efeito para buscar dados quando modal abre
+    React.useEffect(() => {
+      if (isOpen && technician) {
+        fetchTodayRoute();
+        fetchCompletedRoute();
+      }
+    }, [isOpen, technician, fetchTodayRoute, fetchCompletedRoute]);
+
+    // Função para formatar data/hora (CALC_RESTANTE)
+    const formatDateTime = (dateTimeString) => {
+      if (!dateTimeString) return 'N/A';
+      
+      try {
+        const date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) return 'N/A';
+        
+        // Formatar como dd/MM/yyyy hh:mm
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+      } catch (error) {
+        return 'N/A';
+      }
+    };
+
+    // Função para obter número da ordem com cor
+    const getOrderNumber = (ordem) => {
+      if (ordem.TB02115_ORDEM === 0) {
+        return { number: '-', isRed: true };
+      }
+      return { number: ordem.TB02115_ORDEM, isRed: false };
+    };
+
+    // Função para obter equipamento com fallback
+    const getEquipment = (ordem) => {
+      return ordem.TB01010_RESUMIDO || ordem.TB01010_NOME || 'N/A';
+    };
+
+    // Função para obter série/patrimônio
+    const getSeriePatrimonio = (ordem) => {
+      const serie = ordem.TB02115_NUMSERIE || '';
+      const patrimonio = ordem.TB02112_PAT || '';
+      
+      if (serie && patrimonio) {
+        return `${serie} / ${patrimonio}`;
+      } else if (serie) {
+        return serie;
+      } else if (patrimonio) {
+        return patrimonio;
+      }
+      return 'N/A';
+    };
+
+    // Função para reordenar itens
+    const reorderItems = async (reorderedData) => {
+      try {
+        setIsReordering(true);
+        
+        // Obter ID do técnico
+        const technicianId = getTechnicianIdByName(technician);
+        if (!technicianId) {
+          throw new Error(`ID do técnico ${technician} não encontrado`);
+        }
+        
+        console.log('🔄 Enviando reordenação:', reorderedData);
+        
+        const response = await fetch('/api/orders/reorder-sequence', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            technicianId,
+            reorderedItems: reorderedData
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Erro ao reordenar sequências');
+        }
+        
+        console.log('✅ Reordenação concluída:', result);
+        
+        // Recarregar dados
+        await fetchTodayRoute();
+        
+      } catch (error) {
+        console.error('❌ Erro ao reordenar:', error);
+        setRouteError(error.message);
+      } finally {
+        setIsReordering(false);
+      }
+    };
+
+    // Função para lidar com drag start
+    const handleDragStart = (e, ordem, index) => {
+      if (ordem.Tipo !== 'Roteirizado') return;
+      
+      setDraggedItem({ ordem, index });
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', e.target.outerHTML);
+    };
+
+    // Função para lidar com drag over
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    };
+
+    // Função para lidar com drop
+    const handleDrop = (e, targetIndex) => {
+      e.preventDefault();
+      
+      if (!draggedItem) return;
+      
+      const sourceIndex = draggedItem.index;
+      if (sourceIndex === targetIndex) {
+        setDraggedItem(null);
+        return;
+      }
+      
+      // Criar nova lista reordenada
+      const newData = [...routeData];
+      const [removed] = newData.splice(sourceIndex, 1);
+      newData.splice(targetIndex, 0, removed);
+      
+      // Recalcular sequências apenas para itens roteirizados
+      const reorderedItems = [];
+      let sequence = 1;
+      
+      newData.forEach((item) => {
+        if (item.Tipo === 'Roteirizado') {
+          if (item.TB02115_ORDEM !== sequence) {
+            reorderedItems.push({
+              osCode: item.TB02115_CODIGO,
+              newSequence: sequence
+            });
+          }
+          sequence++;
+        }
+      });
+      
+      if (reorderedItems.length > 0) {
+        reorderItems(reorderedItems);
+      }
+      
+      setDraggedItem(null);
+    };
+
+    // Função para lidar com clique em ordem não roteirizada
+    const handleNonRoutedClick = (ordem) => {
+      if (ordem.Tipo === 'Roteirizado') return;
+      
+      setShowSequenceInput(ordem.TB02115_CODIGO);
+      setSequenceInputValue('');
+    };
+
+    // Função para salvar nova sequência
+    const handleSaveSequence = async () => {
+      if (!showSequenceInput || !sequenceInputValue) return;
+      
+      const newSequence = parseInt(sequenceInputValue);
+      if (isNaN(newSequence) || newSequence < 1) {
+        alert('Por favor, digite um número válido maior que 0');
+        return;
+      }
+      
+      // Encontrar a ordem
+      const ordem = routeData.find(item => item.TB02115_CODIGO === showSequenceInput);
+      if (!ordem) return;
+      
+      // Calcular reordenações necessárias
+      const roteirizadas = routeData.filter(item => item.Tipo === 'Roteirizado');
+      const maxSequence = roteirizadas.length;
+      
+      const targetSequence = Math.min(newSequence, maxSequence + 1);
+      
+      const reorderedItems = [{
+        osCode: ordem.TB02115_CODIGO,
+        newSequence: targetSequence
+      }];
+      
+      // Ajustar sequências de outras ordens se necessário
+      roteirizadas.forEach((item) => {
+        if (item.TB02115_ORDEM >= targetSequence) {
+          reorderedItems.push({
+            osCode: item.TB02115_CODIGO,
+            newSequence: item.TB02115_ORDEM + 1
+          });
+        }
+      });
+      
+      await reorderItems(reorderedItems);
+      
+      setShowSequenceInput(null);
+      setSequenceInputValue('');
     };
 
     // Dados mock para teste visual
@@ -5831,8 +6350,24 @@ initializeApp();
                 <h3 className="route-section-title">
                   <i className="bi bi-clock"></i>
                   Em aberto
-                  <span className="record-counter">{mockOpenOrders.length}</span>
+                  <span className="record-counter">{routeData.length}</span>
                 </h3>
+                
+                {isLoadingRoute && (
+                  <div className="loading-indicator">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>Carregando roteiro...</span>
+                  </div>
+                )}
+                
+                {routeError && (
+                  <div className="error-message">
+                    <i className="bi bi-exclamation-triangle"></i>
+                    <span>Erro: {routeError}</span>
+                  </div>
+                )}
+                
+                {!isLoadingRoute && !routeError && (
                 <div className="route-table-container">
                   <table className="route-table">
                     <thead>
@@ -5846,19 +6381,87 @@ initializeApp();
                       </tr>
                     </thead>
                     <tbody>
-                      {mockOpenOrders.map(order => (
-                        <tr key={order.id} className="route-table-row open">
-                          <td className="order-number">#{order.orderNumber}</td>
-                          <td className="order-os">{order.os}</td>
-                          <td className="order-cliente" title={order.endereco}>{order.cliente}</td>
-                          <td className="order-equipamento" title={order.motivoOS}>{order.equipamento}</td>
-                          <td className="order-serie">{order.seriePatrimonio}</td>
-                          <td className="order-previsao">{order.previsao}</td>
+                        {routeData.map((ordem, index) => {
+                          const orderNumber = getOrderNumber(ordem);
+                          const isRoteirizado = ordem.Tipo === 'Roteirizado';
+                          const isNaoRoteirizado = ordem.Tipo === 'Não roteirizado';
+                          
+                          return (
+                            <tr 
+                              key={`${ordem.TB02115_CODIGO}-${index}`} 
+                              className={`route-table-row open ${isRoteirizado ? 'draggable' : ''} ${isNaoRoteirizado ? 'clickable' : ''}`}
+                              draggable={isRoteirizado}
+                              onDragStart={(e) => handleDragStart(e, ordem, index)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, index)}
+                              onClick={() => isNaoRoteirizado && handleNonRoutedClick(ordem)}
+                              style={{ 
+                                cursor: isRoteirizado ? 'move' : isNaoRoteirizado ? 'pointer' : 'default',
+                                opacity: isReordering ? 0.7 : 1
+                              }}
+                            >
+                              <td className={`order-number ${orderNumber.isRed ? 'order-red' : ''}`}>
+                                {showSequenceInput === ordem.TB02115_CODIGO ? (
+                                  <div className="sequence-input-container">
+                                    <input
+                                      type="number"
+                                      value={sequenceInputValue}
+                                      onChange={(e) => setSequenceInputValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveSequence();
+                                        if (e.key === 'Escape') setShowSequenceInput(null);
+                                      }}
+                                      className="sequence-input"
+                                      placeholder="Seq."
+                                      min="1"
+                                      autoFocus
+                                    />
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleSaveSequence();
+                                      }}
+                                      className="sequence-save-btn"
+                                    >
+                                      ✓
+                                    </button>
+                                    <button 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowSequenceInput(null);
+                                      }}
+                                      className="sequence-cancel-btn"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ) : (
+                                  orderNumber.number
+                                )}
+                              </td>
+                              <td className="order-os">{ordem.TB02115_CODIGO}</td>
+                              <td className="order-cliente" title={ordem.ENDERECO || 'Endereço não informado'}>
+                                {ordem.TB01008_NOME}
+                              </td>
+                              <td className="order-equipamento" title={ordem.TB02115_NOME || 'Motivo não informado'}>
+                                {getEquipment(ordem)}
+                              </td>
+                              <td className="order-serie">{getSeriePatrimonio(ordem)}</td>
+                              <td className="order-previsao">{formatDateTime(ordem.CALC_PREVISAO)}</td>
                         </tr>
-                      ))}
+                          );
+                        })}
+                        {routeData.length === 0 && (
+                          <tr>
+                            <td colSpan="6" className="empty-message">
+                              Nenhuma ordem encontrada para hoje
+                            </td>
+                          </tr>
+                        )}
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
 
               {/* Tabela Concluídas */}
@@ -5866,9 +6469,24 @@ initializeApp();
                 <h3 className="route-section-title">
                   <i className="bi bi-check-circle"></i>
                   Concluídas
-                  <span className="record-counter">{mockCompletedOrders.length}</span>
-                  <span className="total-time-text">Tempo produzido: {calculateTotalTime(mockCompletedOrders)}</span>
+                  <span className="record-counter">{completedData.length}</span>
+                  <span className="total-time-text">Tempo total: {calculateTotalCompletedTime(completedData)}</span>
                 </h3>
+                
+                {isLoadingCompleted && (
+                  <div className="loading-container">
+                    <div className="loading-spinner"></div>
+                    <span>Carregando ordens concluídas...</span>
+                  </div>
+                )}
+                
+                {completedError && (
+                  <div className="error-container">
+                    <span>❌ Erro ao buscar ordens concluídas: {completedError}</span>
+                  </div>
+                )}
+                
+                {!isLoadingCompleted && !completedError && (
                 <div className="route-table-container">
                   <table className="route-table">
                     <thead>
@@ -5884,24 +6502,39 @@ initializeApp();
                       </tr>
                     </thead>
                     <tbody>
-                      {mockCompletedOrders.map(order => (
-                        <tr key={order.id} className="route-table-row completed">
-                          <td className="order-os">{order.os}</td>
-                          <td className="order-cliente" title={order.endereco}>{order.cliente}</td>
-                          <td className="order-equipamento" title={order.motivoOS}>{order.equipamento}</td>
-                          <td className="order-serie">{order.seriePatrimonio}</td>
-                          <td className="order-condicao">{order.condicao}</td>
-                          <td className="order-horario">{order.horarioInicial} - {order.horarioFinal}</td>
-                          <td className="order-tempo">{order.tempo}</td>
+                        {completedData.map((ordem, index) => {
+                          const equipamento = ordem.TB01010_NOME; // Usar TB01010_NOME como especificado para concluídas
+                          const seriePatrimonio = [ordem.TB02122_NUMSERIE, ordem.TB02112_PAT].filter(Boolean).join(' / ') || 'N/A';
+                          
+                          // Debug dos dados de horário
+                          console.log(`🕐 Ordem ${ordem.TB02122_NUMOS}:`, {
+                            horaInicial: ordem.TB02122_HORAINI,
+                            horaFinal: ordem.TB02122_HORAFIM,
+                            tipo: typeof ordem.TB02122_HORAINI
+                          });
+                          
+                          const horarioRange = `${formatTime(ordem.TB02122_HORAINI)} - ${formatTime(ordem.TB02122_HORAFIM)}`;
+                          const tempo = calculateAttendanceTime(ordem.TB02122_HORAINI, ordem.TB02122_HORAFIM);
+                          const hasPendingParts = ordem.PECAPENDENTE === 1;
+                          
+                          return (
+                            <tr key={`${ordem.TB02122_CODIGO}-${index}`} className="route-table-row completed">
+                              <td className="order-os">{ordem.TB02122_NUMOS}</td>
+                              <td className="order-cliente">{ordem.TB01008_NOME}</td>
+                              <td className="order-equipamento">{equipamento}</td>
+                              <td className="order-serie">{seriePatrimonio}</td>
+                              <td className="order-condicao">{ordem.TB01055_NOME || 'N/A'}</td>
+                              <td className="order-horario">{horarioRange}</td>
+                              <td className="order-tempo">{tempo}</td>
                           <td className="order-actions">
-                            {order.hasPendingParts && (
+                                {hasPendingParts && (
                               <button className="btn-parts has-pending" title="Peças pendentes">
                                 <i className="bi bi-tools"></i>
                               </button>
                             )}
                             <button 
                               className="btn-details"
-                              onClick={() => handleShowDetails(order)}
+                                  onClick={() => openDetailsModal(ordem)}
                               title="Ver detalhes"
                             >
                               <i className="bi bi-info-circle"></i>
@@ -5909,10 +6542,19 @@ initializeApp();
                             </button>
                           </td>
                         </tr>
-                      ))}
+                          );
+                        })}
+                        {completedData.length === 0 && (
+                          <tr>
+                            <td colSpan="8" className="empty-message">
+                              Nenhuma ordem concluída encontrada para hoje
+                            </td>
+                          </tr>
+                        )}
                     </tbody>
                   </table>
                 </div>
+                )}
               </div>
             </div>
           </div>
@@ -6009,6 +6651,124 @@ initializeApp();
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        
+        {/* Modal de Detalhes */}
+        {showDetailsModal && selectedCompletedOrder && (
+          <div className="details-modal-overlay" onClick={closeDetailsModal}>
+            <div className="details-modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="details-modal-header">
+                <h3>Detalhes da OS {selectedCompletedOrder.TB02122_NUMOS}</h3>
+                <button className="details-modal-close" onClick={closeDetailsModal}>
+                  <i className="bi bi-x"></i>
+                </button>
+              </div>
+              
+              <div className="details-modal-body">
+                {/* Laudo */}
+                <div className="details-section">
+                  <h4>Laudo</h4>
+                  <div className="laudo-content">
+                    {selectedCompletedOrder.TB02122_OBS || 'Nenhum laudo registrado'}
+                  </div>
+                </div>
+                
+                {/* Contadores */}
+                <div className="details-section">
+                  <h4>Contadores</h4>
+                  <div className="counters-grid">
+                    <div className="counter-item">
+                      <label>P&B:</label>
+                      <span>{selectedCompletedOrder.TB02122_CONTADOR || '0'}</span>
+                    </div>
+                    <div className="counter-item">
+                      <label>Cor:</label>
+                      <span>{selectedCompletedOrder.TB02122_CONTADORC || '0'}</span>
+                    </div>
+                    <div className="counter-item">
+                      <label>Dig.:</label>
+                      <span>{selectedCompletedOrder.TB02122_CONTADORDG || '0'}</span>
+                    </div>
+                    <div className="counter-item">
+                      <label>A3 P&B:</label>
+                      <span>{selectedCompletedOrder.TB02122_CONTADORGF || '0'}</span>
+                    </div>
+                    <div className="counter-item">
+                      <label>A3 Cor:</label>
+                      <span>{selectedCompletedOrder.TB02122_CONTADORGFC || '0'}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Peças Pendentes */}
+                {pendingParts.length > 0 && (
+                  <div className="details-section">
+                    <h4>Peças Pendentes</h4>
+                    {isLoadingParts ? (
+                      <div className="loading-message">Carregando peças...</div>
+                    ) : (
+                      <table className="parts-table">
+                        <thead>
+                          <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Quantidade</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pendingParts.map((peca, index) => (
+                            <tr key={index}>
+                              <td>{peca.codigo}</td>
+                              <td>{peca.nome}</td>
+                              <td>{peca.quantidade}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+                
+                {/* Peças Utilizadas */}
+                {usedParts.length > 0 && (
+                  <div className="details-section">
+                    <h4>Peças Utilizadas</h4>
+                    {isLoadingParts ? (
+                      <div className="loading-message">Carregando peças...</div>
+                    ) : (
+                      <table className="parts-table">
+                        <thead>
+                          <tr>
+                            <th>Código</th>
+                            <th>Nome</th>
+                            <th>Quantidade</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {usedParts.map((peca, index) => (
+                            <tr key={index}>
+                              <td>{peca.codigo}</td>
+                              <td>{peca.nome}</td>
+                              <td>{peca.quantidade}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+                
+                {/* Mensagens quando não há peças */}
+                {!isLoadingParts && pendingParts.length === 0 && usedParts.length === 0 && (
+                  <div className="details-section">
+                    <div className="no-parts-message">
+                      Nenhuma peça pendente ou utilizada registrada para esta ordem.
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -7151,7 +7911,7 @@ initializeApp();
           
           ${sortedOrders.map((order, index) => {
             const cliente = order.cliente || order.TB01008_NOME || 'N/A';
-            const equipamento = order.equipamento || order.TB01010_NOME || 'N/A';
+            const equipamento = order.equipamento || order.TB01010_RESUMIDO || order.TB01010_NOME || 'N/A';
             const serie = order.serie || order.TB02115_NUMSERIE || 'N/A';
             const pedidoVinculado = order.pedidoVinculado || order.TB02115_PEDIDO_VINCULADO || 'N/A';
             const endereco = order.endereco || order.TB02115_ENDERECO || 'N/A';
@@ -7535,7 +8295,7 @@ initializeApp();
                 <div className="order-tooltip-item">
                   <span className="order-tooltip-label">Equipamento:</span>
                   <span className="order-tooltip-value">
-                    {tooltipOrder.equipamento || tooltipOrder.TB01010_NOME || 'N/A'}
+                                            {tooltipOrder.equipamento || tooltipOrder.TB01010_RESUMIDO || tooltipOrder.TB01010_NOME || 'N/A'}
                   </span>
                 </div>
                 
@@ -7891,7 +8651,7 @@ initializeApp();
                                             {order.cliente || order.TB02115_CLIENTE || 'N/A'}
                                           </div>
                                           <div className="unlocated-order-equipamento">
-                                            {order.equipamento || order.TB01010_NOME || 'N/A'}
+                                            {order.equipamento || order.TB01010_RESUMIDO || order.TB01010_NOME || 'N/A'}
                                           </div>
                                           <div className="unlocated-order-address">
                                             {order.endereco || order.TB02115_ENDERECO || 'N/A'}
@@ -7929,7 +8689,7 @@ initializeApp();
                                               {order.cliente || order.TB02115_CLIENTE || 'N/A'}
                                             </div>
                                             <div className="unlocated-order-equipamento">
-                                              {order.equipamento || order.TB01010_NOME || 'N/A'}
+                                              {order.equipamento || order.TB01010_RESUMIDO || order.TB01010_NOME || 'N/A'}
                                             </div>
                                             <div className="unlocated-order-address">
                                               {order.endereco || order.TB02115_ENDERECO || 'N/A'}
@@ -8014,7 +8774,7 @@ initializeApp();
                     <div className="order-tooltip-item">
                       <span className="order-tooltip-label">Equipamento:</span>
                       <span className="order-tooltip-value">
-                        {mapTooltipOrder.equipamento || mapTooltipOrder.TB01010_NOME || 'N/A'}
+                        {mapTooltipOrder.equipamento || mapTooltipOrder.TB01010_RESUMIDO || mapTooltipOrder.TB01010_NOME || 'N/A'}
                       </span>
                     </div>
                     
@@ -8202,7 +8962,7 @@ initializeApp();
           }
           if (selectedColumnFilters.equipamento.length > 0) {
             ordensToCount = ordensToCount.filter(ordem => {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               return selectedColumnFilters.equipamento.includes(equipamento);
             });
           }
@@ -8254,7 +9014,7 @@ initializeApp();
           }
           if (selectedColumnFilters.equipamento.length > 0) {
             ordensToCount = ordensToCount.filter(ordem => {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               return selectedColumnFilters.equipamento.includes(equipamento);
             });
           }
@@ -8322,7 +9082,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8384,7 +9144,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8457,7 +9217,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8519,7 +9279,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8600,7 +9360,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8662,7 +9422,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8732,7 +9492,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8791,7 +9551,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8867,7 +9627,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -8926,7 +9686,7 @@ initializeApp();
             
             // Se há filtro de equipamento aplicado, considerar apenas esses equipamentos
             if (selectedColumnFilters.equipamento.length > 0) {
-              const equipamento = ordem.equipamento || ordem.TB01010_NOME;
+              const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME;
               if (!selectedColumnFilters.equipamento.includes(equipamento)) {
                 return;
               }
@@ -9002,7 +9762,7 @@ initializeApp();
               }
             }
             
-            const equipamento = ordem.equipamento || ordem.TB01010_NOME || '';
+            const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME || '';
             if (equipamento) {
               equipamentoData[equipamento] = (equipamentoData[equipamento] || 0) + 1;
             }
@@ -9052,7 +9812,7 @@ initializeApp();
               }
             }
             
-            const equipamento = ordem.equipamento || ordem.TB01010_NOME || '';
+            const equipamento = ordem.equipamento || ordem.TB01010_RESUMIDO || ordem.TB01010_NOME || '';
             if (equipamento) {
               equipamentoData[equipamento] = (equipamentoData[equipamento] || 0) + 1;
             }
@@ -10561,9 +11321,9 @@ initializeApp();
       try {
         // Buscar último atendimento, histórico e defeito em paralelo
         const [lastServiceResponse, historyResponse, defeitoResponse] = await Promise.all([
-          fetch(`/api/equipment/last-service/${order.numeroSerie}`),
-          fetch(`/api/equipment/history/${order.numeroSerie}`),
-          fetch(`/api/orders/${order.id}/defeito`)
+          fetch(`${API_BASE_URL}/api/equipment/last-service/${order.numeroSerie}`),
+          fetch(`${API_BASE_URL}/api/equipment/history/${order.numeroSerie}`),
+          fetch(`${API_BASE_URL}/api/orders/${order.id}/defeito`)
         ]);
 
         if (!lastServiceResponse.ok || !historyResponse.ok) {

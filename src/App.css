@@ -2922,7 +2922,7 @@ body {
 
   .order-row {
     display: grid;
-    grid-template-columns: 68px 1.3fr 1fr;
+    grid-template-columns: 68px 0.8fr 1.5fr; /* Reduzindo espaço do cliente (1.3fr -> 0.8fr) e aumentando do equipamento (1fr -> 1.5fr) */
     gap: 8px;
     padding: 4px 12px;
     border-bottom: 1px solid #f1f5f9;
@@ -2990,10 +2990,12 @@ body {
 }
 
 .order-cliente {
-  font-weight: 500;
+  font-weight: 400; /* Igualando com font-weight do equipamento */
   color: #374151;
   font-size: 9px;
   cursor: help;
+  min-width: 110px;
+  max-width: 110px;
 }
 
 .order-equipamento {
@@ -3001,6 +3003,28 @@ body {
   font-size: 9px;
   font-weight: 400;
   cursor: help;
+}
+
+/* Ajustes específicos para a coluna "Em aberto" */
+.kanban-fixed-column .order-row {
+  grid-template-columns: 68px 0.2fr 1.8fr; /* Cliente ainda menor, equipamento ainda maior */
+  gap: 4px; /* Gap menor para permitir mais sobreposição controlada */
+}
+
+.kanban-fixed-column .order-cliente {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%; /* Criando uma pausa visual - cliente termina bem antes */
+  padding-right: 16px; /* Padding ainda maior para garantir separação clara */
+}
+
+.kanban-fixed-column .order-equipamento {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: -16px; /* Mantendo posição atual do início do equipamento */
+  padding-left: 0; /* Sem padding para começar o mais à esquerda possível */
 }
 
 .sla-indicator {
@@ -5031,9 +5055,9 @@ body {
 
 /* Seção principal */
 .team-section {
-  margin-top: 120px; /* 60px header + 60px filters */
-  padding: 24px;
-  height: calc(100vh - 120px);
+  margin-top: 80px; /* Reduzindo de 120px para 80px para eliminar espaçamento desnecessário */
+  padding: 16px 24px; /* Reduzindo padding superior de 24px para 16px */
+  height: calc(100vh - 80px); /* Ajustando altura conforme novo margin-top */
   overflow-y: auto;
 }
 
@@ -5041,8 +5065,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
+  margin-bottom: 16px; /* Reduzindo de 24px para 16px */
+  padding-bottom: 12px; /* Reduzindo de 16px para 12px */
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -5177,6 +5201,7 @@ body {
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  height: calc(100vh - 180px); /* Definindo altura específica para o board */
 }
 
 .team-column {
@@ -5189,6 +5214,8 @@ body {
   display: flex;
   flex-direction: column;
   border: 1px solid #e2e8f0;
+  height: 100%; /* Fazer a coluna usar toda a altura disponível */
+  overflow: hidden; /* Impedir overflow na coluna principal */
 }
 
 .team-column-header {
@@ -5276,6 +5303,8 @@ body {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  max-height: calc(100vh - 280px); /* Limitando altura para forçar scroll interno */
+  padding-right: 4px; /* Espaço para a barra de scroll */
 }
 
 .team-item {
@@ -5352,14 +5381,21 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  overflow: hidden;
+  gap: 16px; /* Reduzindo gap de 24px para 16px */
+  overflow-y: auto; /* Permitindo scroll no container das áreas */
   min-width: 0;
+  height: 100%; /* Usar toda altura disponível */
 }
 
-.areas-section,
+.areas-section {
+  flex: 0 0 auto; /* Não expandir, apenas usar espaço necessário */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .coordinators-section {
-  flex: 1;
+  flex: 1; /* Usar espaço restante disponível */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5426,7 +5462,16 @@ body {
   font-weight: 400;
 }
 
-.areas-grid,
+.areas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  overflow-y: auto;
+  padding: 4px;
+  min-height: 0;
+  max-height: 400px; /* Limitando altura das áreas */
+}
+
 .coordinators-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -5434,6 +5479,7 @@ body {
   overflow-y: auto;
   padding: 4px;
   min-height: 0;
+  flex: 1; /* Usar todo espaço disponível restante */
 }
 
 .area-card {
@@ -8184,6 +8230,17 @@ body {
   background: white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   margin-bottom: 24px;
+  max-height: 300px; /* Limitação padrão */
+  overflow-y: auto;
+}
+
+/* Limitações específicas para cada seção */
+.route-section:nth-child(1) .route-table-container {
+  max-height: 280px; /* Seção "Em aberto" - 6 linhas aproximadamente */
+}
+
+.route-section:nth-child(2) .route-table-container {
+  max-height: 240px; /* Seção "Concluídas" - 5 linhas aproximadamente */
 }
 
 .route-table {
@@ -8253,15 +8310,315 @@ body {
   text-align: center;
 }
 
+.route-table .order-number.order-red {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* Estilos para reordenação */
+.route-table-row.draggable {
+  transition: background-color 0.2s ease;
+}
+
+.route-table-row.draggable:hover {
+  background-color: #f0f9ff !important;
+  cursor: move;
+}
+
+.route-table-row.clickable:hover {
+  background-color: #fefce8 !important;
+  cursor: pointer;
+}
+
+/* Container do input de sequência */
+.sequence-input-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.sequence-input {
+  width: 40px;
+  padding: 2px 4px;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+}
+
+.sequence-input:focus {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.sequence-save-btn,
+.sequence-cancel-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.sequence-save-btn {
+  background-color: #10b981;
+  color: white;
+}
+
+.sequence-save-btn:hover {
+  background-color: #059669;
+}
+
+.sequence-cancel-btn {
+  background-color: #ef4444;
+  color: white;
+}
+
+.sequence-cancel-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Estilos para o modal de detalhes */
+.details-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.details-modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.details-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+}
+
+.details-modal-header h3 {
+  margin: 0;
+  color: #1a202c;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.details-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.details-modal-close:hover {
+  background-color: #f1f5f9;
+  color: #374151;
+}
+
+.details-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.details-section {
+  margin-bottom: 32px;
+}
+
+.details-section:last-child {
+  margin-bottom: 0;
+}
+
+.details-section h4 {
+  margin: 0 0 16px 0;
+  color: #374151;
+  font-size: 16px;
+  font-weight: 600;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.laudo-content {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  color: #374151;
+  line-height: 1.6;
+  min-height: 80px;
+  white-space: pre-wrap;
+}
+
+.counters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+
+.counter-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.counter-item label {
+  font-weight: 500;
+  color: #4b5563;
+  margin: 0;
+}
+
+.counter-item span {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.parts-table th {
+  background: #f9fafb;
+  color: #374151;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.parts-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  color: #4b5563;
+}
+
+.parts-table tr:last-child td {
+  border-bottom: none;
+}
+
+.parts-table tr:hover {
+  background-color: #f9fafb;
+}
+
+.loading-message {
+  text-align: center;
+  color: #6b7280;
+  padding: 20px;
+  font-style: italic;
+}
+
+.no-parts-message {
+  text-align: center;
+  color: #9ca3af;
+  padding: 32px;
+  font-style: italic;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px dashed #d1d5db;
+}
+
+/* Botão de peças pendentes */
+.btn-parts {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 6px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-parts:hover {
+  background: #d97706;
+}
+
+.btn-parts.has-pending {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Botão de detalhes */
+.btn-details {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-details:hover {
+  background: #2563eb;
+}
+
+.btn-details i {
+  font-size: 14px;
+}
+
 .route-table .order-os {
   font-weight: 600;
   color: #2d3748;
-  min-width: 120px;
+  min-width: 80px; /* Reduzido de 120px para 80px - máximo 6 caracteres */
+  max-width: 80px;
 }
 
 .route-table .order-cliente {
-  min-width: 150px;
-  max-width: 200px;
+  min-width: 180px; /* Aumentado de 150px para 180px */
+  max-width: 220px; /* Aumentado de 200px para 220px */
   cursor: help;
 }
 
