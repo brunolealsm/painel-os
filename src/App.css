@@ -10,6 +10,12 @@ body {
   color: #2d3748;
 }
 
+/* Animação para indicadores de loading */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .app {
   min-height: 100vh;
   display: flex;
@@ -390,11 +396,14 @@ body {
 
 /* Search Container */
 .search-container {
-  min-width: 250px;
+  min-width: 400px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .search-input {
-  width: 100%;
+  flex: 1;
   padding: 6px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 5px;
@@ -3126,7 +3135,7 @@ body {
 .config-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
 }
 
 .form-group {

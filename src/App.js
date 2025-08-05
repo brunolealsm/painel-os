@@ -250,6 +250,7 @@ const ProcessConfig = () => {
   const statusTomorrowRef = useRef(null);
   const statusUptodateRef = useRef(null);
   const statusOpenRef = useRef(null);
+  const statusFinishRef = useRef(null);
 
   // Função para carregar dados da API
   const loadData = async () => {
@@ -267,6 +268,7 @@ const ProcessConfig = () => {
         if (statusTomorrowRef.current) statusTomorrowRef.current.value = result.data.status_tomorrow || '';
         if (statusUptodateRef.current) statusUptodateRef.current.value = result.data.status_uptodate || '';
         if (statusOpenRef.current) statusOpenRef.current.value = result.data.status_open || '';
+        if (statusFinishRef.current) statusFinishRef.current.value = result.data.status_finish || '';
       } else {
         // Valores padrão
         if (statusInserviceRef.current) statusInserviceRef.current.value = 'ES';
@@ -274,6 +276,7 @@ const ProcessConfig = () => {
         if (statusTomorrowRef.current) statusTomorrowRef.current.value = 'PD';
         if (statusUptodateRef.current) statusUptodateRef.current.value = 'ED';
         if (statusOpenRef.current) statusOpenRef.current.value = 'EA';
+        if (statusFinishRef.current) statusFinishRef.current.value = 'FN';
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -284,6 +287,7 @@ const ProcessConfig = () => {
       if (statusTomorrowRef.current) statusTomorrowRef.current.value = 'PD';
       if (statusUptodateRef.current) statusUptodateRef.current.value = 'ED';
       if (statusOpenRef.current) statusOpenRef.current.value = 'EA';
+      if (statusFinishRef.current) statusFinishRef.current.value = 'FN';
     } finally {
       setIsLoading(false);
     }
@@ -300,7 +304,8 @@ const ProcessConfig = () => {
         status_forward: statusForwardRef.current?.value || '',
         status_tomorrow: statusTomorrowRef.current?.value || '',
         status_uptodate: statusUptodateRef.current?.value || '',
-        status_open: statusOpenRef.current?.value || ''
+        status_open: statusOpenRef.current?.value || '',
+        status_finish: statusFinishRef.current?.value || ''
       };
       
       const response = await fetch(`${API_BASE_URL}/api/config/process`, {
@@ -384,7 +389,6 @@ const ProcessConfig = () => {
               height: '20px'
             }}
           />
-          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
         </div>
 
         <div className="form-group">
@@ -415,7 +419,6 @@ const ProcessConfig = () => {
               height: '20px'
             }}
           />
-          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
         </div>
 
         <div className="form-group">
@@ -446,7 +449,6 @@ const ProcessConfig = () => {
               height: '20px'
             }}
           />
-          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
         </div>
 
         <div className="form-group">
@@ -477,7 +479,6 @@ const ProcessConfig = () => {
               height: '20px'
             }}
           />
-          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
         </div>
 
         <div className="form-group">
@@ -508,7 +509,216 @@ const ProcessConfig = () => {
               height: '20px'
             }}
           />
-          <small className="form-help">Máximo 2 caracteres (letras e números)</small>
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="status_finish">Finalizado</label>
+          <input
+            ref={statusFinishRef}
+            type="text"
+            id="status_finish"
+            placeholder="Ex: FN"
+            className="form-input process-input"
+            maxLength="2"
+            onChange={() => handleInputChange(statusFinishRef)}
+            style={{
+              textTransform: 'uppercase',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              width: '50px',
+              maxWidth: '50px',
+              minWidth: '50px',
+              fontSize: '12px',
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '3px',
+              boxSizing: 'border-box',
+              height: '20px'
+            }}
+          />
+        </div>
+
+        <div className="form-actions">
+          <button 
+            onClick={saveData}
+            disabled={isSaving}
+            style={{
+              background: '#7c4dff',
+              color: 'white',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer'
+            }}
+          >
+            {isSaving ? 'Salvando...' : 'Salvar dados'}
+          </button>
+        </div>
+
+        {message && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            borderRadius: '6px',
+            fontSize: '14px',
+            background: message.includes('sucesso') ? '#f0fff4' : '#fed7d7',
+            color: message.includes('sucesso') ? '#22543d' : '#742a2a',
+            border: `1px solid ${message.includes('sucesso') ? '#9ae6b4' : '#fc8181'}`
+          }}>
+            {message}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Componente de configuração da empresa
+const CompanyConfig = () => {
+  // Estado usando useRef para evitar problemas de renderização
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  
+  // Usar refs para os inputs - abordagem mais direta
+  const companyRef = useRef(null);
+  const tokenRef = useRef(null);
+
+  // Função para carregar dados da API
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      setMessage('');
+      
+      const response = await fetch(`${API_BASE_URL}/api/config/company`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        // Definir valores diretamente nos inputs
+        if (companyRef.current) companyRef.current.value = result.data.company || '';
+        if (tokenRef.current) tokenRef.current.value = result.data.token || '';
+      } else {
+        // Valores padrão
+        if (companyRef.current) companyRef.current.value = '';
+        if (tokenRef.current) tokenRef.current.value = '';
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados da empresa:', error);
+      setMessage('Erro ao carregar dados da API');
+      // Valores padrão em caso de erro
+      if (companyRef.current) companyRef.current.value = '';
+      if (tokenRef.current) tokenRef.current.value = '';
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para salvar dados
+  const saveData = async () => {
+    try {
+      setIsSaving(true);
+      setMessage('');
+      
+      const formData = {
+        company: companyRef.current?.value || '',
+        token: tokenRef.current?.value || ''
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/api/config/company`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setMessage('Configurações da empresa salvas com sucesso!');
+        // Recarregar a página para atualizar o header com o novo nome da empresa
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setMessage('Erro ao salvar configurações da empresa');
+      }
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      setMessage('Erro ao salvar configurações da empresa');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Carregar dados ao montar o componente
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="database-config">
+        <h3 className="config-title">Configuração da empresa</h3>
+        <p className="config-description">Configure as informações da empresa</p>
+        <div style={{ textAlign: 'center', padding: '20px', color: '#6c757d' }}>
+          Carregando configurações...
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="database-config">
+      <h3 className="config-title">Configuração da empresa</h3>
+      <p className="config-description">Configure as informações da empresa</p>
+      
+      <div className="config-form">
+        <div className="form-group">
+          <label htmlFor="company">Nome da Empresa</label>
+          <input
+            ref={companyRef}
+            type="text"
+            id="company"
+            placeholder="Digite o nome da empresa"
+            className="form-input"
+            style={{
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '10px 12px',
+              fontSize: '14px',
+              width: '100%',
+              maxWidth: '400px'
+            }}
+          />
+        </div>
+
+        <div className="form-group">
+          <label htmlFor="token">Token</label>
+          <input
+            ref={tokenRef}
+            type="text"
+            id="token"
+            placeholder="Digite o token"
+            className="form-input"
+            style={{
+              background: 'white',
+              color: '#2d3748',
+              border: '1px solid #e2e8f0',
+              borderRadius: '6px',
+              padding: '10px 12px',
+              fontSize: '14px',
+              width: '100%',
+              maxWidth: '400px'
+            }}
+          />
         </div>
 
         <div className="form-actions">
@@ -1157,7 +1367,6 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [openModal, setOpenModal] = useState(null);
   const [selectedOrders, setSelectedOrders] = useState([]);
-  const [showOnlyLate, setShowOnlyLate] = useState(false);
   const [techniqueColumns, setTechniqueColumns] = useState({});
   const [columnOrder, setColumnOrder] = useState([]);
   const [isDragOverOpen, setIsDragOverOpen] = useState(false);
@@ -1473,6 +1682,9 @@ function App() {
   const [apiData, setApiData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [dataSource, setDataSource] = useState('mock');
+  const [companyName, setCompanyName] = useState('Empresa teste');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState({ current: 0, total: 0, message: '' });
   
   // Estrutura para agrupamentos de técnicos
   const [technicianGroups, setTechnicianGroups] = useState({});
@@ -1681,6 +1893,87 @@ function App() {
     console.log('🚪 Logout realizado');
   };
 
+  // Função para carregar nome da empresa
+  const loadCompanyName = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/config/company`);
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.company) {
+        setCompanyName(result.data.company);
+        console.log('🏢 Nome da empresa carregado:', result.data.company);
+      } else {
+        console.log('🏢 Nome da empresa não encontrado, usando padrão');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar nome da empresa:', error);
+    }
+  }, []);
+
+  // Função para atualizar dados (refresh)
+  const refreshData = useCallback(async () => {
+    if (isRefreshing) return; // Evita múltiplas atualizações simultâneas
+    
+    setIsRefreshing(true);
+    setRefreshProgress({ current: 0, total: 3, message: 'Iniciando atualização...' });
+    
+    try {
+      console.log('🔄 Iniciando atualização de dados...');
+      
+      // Passo 1: Carregar ordens em aberto
+      setRefreshProgress({ current: 1, total: 3, message: 'Carregando ordens em aberto...' });
+      await new Promise(resolve => setTimeout(resolve, 500)); // Pequeno delay para UX
+      
+      const ordersResponse = await fetch(`${API_BASE_URL}/api/orders/open?t=${Date.now()}`);
+      const ordersResult = await ordersResponse.json();
+      
+      if (ordersResult.success) {
+        setApiData(ordersResult.data);
+        setDataSource(ordersResult.dataSource);
+        setAvailableOrdersState(ordersResult.data);
+        console.log('✅ Ordens atualizadas:', ordersResult.data.length, 'cidades');
+      }
+      
+      // Passo 2: Carregar técnicos
+      setRefreshProgress({ current: 2, total: 3, message: 'Carregando dados de técnicos...' });
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const techniciansResponse = await fetch(`${API_BASE_URL}/api/technicians`);
+      const techniciansResult = await techniciansResponse.json();
+      
+      if (techniciansResult.success) {
+        const technicianMap = {};
+        const nameToIdMap = {};
+        
+        techniciansResult.data.forEach(tech => {
+          const cleanName = tech.NOME_TECNICO?.trim() || 'Sem nome';
+          technicianMap[cleanName] = tech;
+          nameToIdMap[cleanName] = tech.id || cleanName;
+        });
+        
+        setTechnicianDataCache(technicianMap);
+        setTechnicianNameToIdMap(nameToIdMap);
+        console.log('✅ Técnicos atualizados:', techniciansResult.data.length, 'técnicos');
+      }
+      
+      // Passo 3: Finalizar
+      setRefreshProgress({ current: 3, total: 3, message: 'Finalizando atualização...' });
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      console.log('✅ Atualização de dados concluída com sucesso!');
+      
+    } catch (error) {
+      console.error('❌ Erro durante atualização:', error);
+      setRefreshProgress({ current: 0, total: 0, message: 'Erro na atualização' });
+    } finally {
+      // Limpar indicadores após um delay
+      setTimeout(() => {
+        setIsRefreshing(false);
+        setRefreshProgress({ current: 0, total: 0, message: '' });
+      }, 1000);
+    }
+  }, [isRefreshing]);
+
   // Verificar autenticação ao carregar
   useEffect(() => {
     console.log('🔍 DEBUG: Verificando autenticação ao carregar...');
@@ -1732,7 +2025,10 @@ function App() {
     } else {
       console.log('🔍 DEBUG: Nenhum token ou userData encontrado');
     }
-  }, []);
+    
+    // Carregar nome da empresa
+    loadCompanyName();
+  }, [loadCompanyName]);
 
   // Função para atualizar status de uma etapa
   const updateLoadingStep = useCallback((stepId, status) => {
@@ -2948,23 +3244,19 @@ initializeApp();
 
   const getFilteredOrders = React.useMemo(() => {
     console.log('🔍 getFilteredOrders - availableOrdersState:', availableOrdersState);
-    console.log('🔍 getFilteredOrders - showOnlyLate:', showOnlyLate);
     console.log('🔍 getFilteredOrders - searchTerm:', searchTerm);
     
     const filtered = availableOrdersState
       .filter(item => item.cidade && item.cidade.trim() !== '') // Garantir que tem cidade
       .map(item => ({
         ...item,
-        ordens: (showOnlyLate 
-          ? item.ordens.filter(ordem => ordem.CALC_RESTANTE <= 24) // Usar CALC_RESTANTE para filtrar atrasadas
-          : item.ordens
-        ).filter(ordem => orderMatchesSearch(ordem, searchTerm)) // Aplicar filtro de busca
+        ordens: item.ordens.filter(ordem => orderMatchesSearch(ordem, searchTerm)) // Aplicar filtro de busca
       }))
       .filter(item => item.ordens.length > 0);
     
     console.log('🔍 getFilteredOrders - resultado filtrado:', filtered);
     return filtered;
-  }, [availableOrdersState, showOnlyLate, searchTerm]);
+  }, [availableOrdersState, searchTerm]);
 
   const getGroupedByCity = React.useMemo(() => {
     const filtered = getFilteredOrders;
@@ -11755,7 +12047,7 @@ initializeApp();
     <>
       <div className={`app ${isInitialLoading ? 'loading' : ''}`}>
         <header className="main-header">
-        <div className="company-name">Empresa teste</div>
+        <div className="company-name">{companyName}</div>
         <nav className="main-nav">
           <button 
             className={`nav-item ${activeSection === 'Board' ? 'active' : ''}`}
@@ -11802,7 +12094,7 @@ initializeApp();
                     : 'Usando dados mock - configure o banco'
                 }
               >
-                {dataSource === 'sql_server' ? '🟢 SQL Server' : '🟡 Mock Data'}
+                {dataSource === 'sql_server' ? '🟢 Conectado' : '🟡 Mock Data'}
               </span>
             )}
           </div>
@@ -11873,6 +12165,12 @@ initializeApp();
             >
               Usuários
             </button>
+            <button 
+              className={`config-nav-item ${activeConfigSection === 'company' ? 'active' : ''}`}
+              onClick={() => setActiveConfigSection('company')}
+            >
+              Empresa
+            </button>
           </div>
         </div>
       )}
@@ -11917,6 +12215,12 @@ initializeApp();
             userFormErrors={userFormErrors}
             setUserFormErrors={setUserFormErrors}
           />
+        </div>
+      )}
+
+      {showConfigMenu && currentUser && currentUser.type === '1' && activeConfigSection === 'company' && (
+        <div className="config-content">
+          <CompanyConfig />
         </div>
       )}
 
@@ -12002,17 +12306,51 @@ initializeApp();
                 )}
               </div>
 
-              <span className="filter-separator">|</span>
 
-              <button 
-                className={`filter-btn ${showOnlyLate ? 'active' : ''}`}
-                onClick={() => setShowOnlyLate(!showOnlyLate)}
-              >
-                Atrasadas
-              </button>
             </div>
 
             <div className="search-container">
+              <button 
+                className="refresh-btn"
+                onClick={refreshData}
+                disabled={isRefreshing}
+                title="Atualizar dados das ordens de serviço e técnicos"
+                style={{
+                  marginRight: '12px',
+                  padding: '5px 16px',
+                  background: 'transparent',
+                  color: isRefreshing ? '#6c757d' : '#4a5568',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isRefreshing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  minWidth: '140px',
+                  justifyContent: 'center'
+                }}
+              >
+                {isRefreshing ? (
+                  <>
+                    <span style={{ 
+                      width: '14px', 
+                      height: '14px', 
+                      border: '2px solid #6c757d',
+                      borderTop: '2px solid transparent',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      display: 'inline-block'
+                    }}></span>
+                    Atualizando...
+                  </>
+                ) : (
+                  <>
+                    🔄 Atualizar dados
+                  </>
+                )}
+              </button>
               <input
                 type="text"
                 placeholder="Pesquisar ordens de serviço..."
@@ -12022,6 +12360,51 @@ initializeApp();
               />
             </div>
             </div>
+
+          {/* Indicador de progresso da atualização */}
+          {isRefreshing && refreshProgress.message && (
+            <div style={{
+              background: '#f8f9fa',
+              border: '1px solid #e9ecef',
+              borderRadius: '6px',
+              padding: '12px 16px',
+              margin: '12px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              color: '#495057'
+            }}>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                border: '2px solid #7c4dff',
+                borderTop: '2px solid transparent',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
+                  {refreshProgress.message}
+                </div>
+                <div style={{ 
+                  background: '#e9ecef', 
+                  borderRadius: '3px', 
+                  height: '6px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{ 
+                    background: '#7c4dff', 
+                    height: '100%',
+                    width: `${(refreshProgress.current / refreshProgress.total) * 100}%`,
+                    transition: 'width 0.3s ease'
+                  }}></div>
+                </div>
+                <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '2px' }}>
+                  {refreshProgress.current} de {refreshProgress.total} etapas concluídas
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="board-section">
             <div className="kanban-board">

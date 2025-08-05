@@ -127,7 +127,7 @@ const Login = ({ onLoginSuccess }) => {
           <div className="login-logo">
             <i className="bi bi-gear-fill"></i>
           </div>
-          <h1>PainelOS</h1>
+          <h1>Verve</h1>
           <p>Sistema de Gestão de Ordens de Serviço</p>
         </div>
 
@@ -204,7 +204,7 @@ const Login = ({ onLoginSuccess }) => {
         </form>
 
         <div className="login-footer">
-          <p>© 2024 PainelOS - Sistema de Gestão</p>
+          <p>© 2024 Verve - Sistema de Gestão</p>
         </div>
       </div>
     </div>
