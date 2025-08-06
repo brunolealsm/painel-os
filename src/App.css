@@ -134,6 +134,7 @@ body {
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 500;
+  font-family: 'Sora', sans-serif;
   color: #718096;
   cursor: pointer;
   border-radius: 6px;
@@ -189,8 +190,9 @@ body {
   background: #f7fafc;
   border: 1px solid #e2e8f0;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: 11.7px;
   font-weight: 500;
+  font-family: 'Sora', sans-serif;
   color: #4a5568;
   cursor: pointer;
   border-radius: 5px;
@@ -407,7 +409,8 @@ body {
   padding: 6px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 5px;
-  font-size: 13px;
+  font-size: 11.7px;
+  font-family: 'Sora', sans-serif;
   outline: none;
   background: #f7fafc;
 }
@@ -8621,13 +8624,13 @@ body {
 .route-table .order-os {
   font-weight: 600;
   color: #2d3748;
-  min-width: 80px; /* Reduzido de 120px para 80px - máximo 6 caracteres */
-  max-width: 80px;
+  min-width: 72px; /* Diminuído 10% de 80px */
+  max-width: 72px;
 }
 
 .route-table .order-cliente {
-  min-width: 180px; /* Aumentado de 150px para 180px */
-  max-width: 220px; /* Aumentado de 200px para 220px */
+  min-width: 135px; /* Diminuído 25% de 180px */
+  max-width: 165px; /* Diminuído 25% de 220px */
   cursor: help;
 }
 
@@ -8649,20 +8652,25 @@ body {
 }
 
 .route-table .order-condicao {
-  min-width: 100px;
+  min-width: 135px; /* Aumentado 35% de 100px */
   font-weight: 500;
   text-align: center;
+  font-size: 90%; /* Diminuído fonte em 10% */
+  cursor: help; /* Indicar que há tooltip */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .route-table .order-horario {
-  min-width: 120px;
-  text-align: center;
+  min-width: 102px; /* Diminuído 15% de 120px */
+  text-align: left; /* Alinhado à esquerda */
   font-size: 12px;
 }
 
 .route-table .order-tempo {
-  min-width: 80px;
-  text-align: center;
+  min-width: 76px; /* Diminuído 5% de 80px */
+  text-align: left; /* Alinhado à esquerda */
   font-weight: 500;
 }
 
@@ -9053,6 +9061,132 @@ body {
   
   .details-sidebar {
     width: 100vw;
+  }
+}
+
+/* Modal de carregamento para atualização de dados */
+.refresh-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: refreshFadeIn 0.3s ease-out;
+}
+
+.refresh-loading-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: refreshSlideIn 0.3s ease-out;
+}
+
+.refresh-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.refresh-loading-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
+  border-radius: 50%;
+  margin-bottom: 8px;
+}
+
+.refresh-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top: 3px solid white;
+  border-radius: 50%;
+  animation: refreshSpin 1s linear infinite;
+}
+
+.refresh-loading-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.refresh-loading-message {
+  font-size: 14px;
+  color: #718096;
+  margin: 0;
+  font-weight: 500;
+}
+
+.refresh-progress-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refresh-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.refresh-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7c4dff 0%, #651fff 100%);
+  transition: width 0.4s ease;
+  border-radius: 4px;
+}
+
+.refresh-progress-text {
+  font-size: 12px;
+  color: #718096;
+  font-weight: 500;
+}
+
+@keyframes refreshFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes refreshSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes refreshSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 

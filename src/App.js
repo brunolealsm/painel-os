@@ -1009,6 +1009,39 @@ const OrderStatusModal = ({ isOpen, results, summary, onClose }) => {
   );
 };
 
+// Modal de carregamento para atualização de dados
+const RefreshLoadingModal = ({ isOpen, progress }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="refresh-loading-overlay">
+      <div className="refresh-loading-modal">
+        <div className="refresh-loading-content">
+          <div className="refresh-loading-icon">
+            <div className="refresh-spinner"></div>
+          </div>
+          <h3 className="refresh-loading-title">Atualizando dados</h3>
+          <p className="refresh-loading-message">{progress.message}</p>
+          
+          <div className="refresh-progress-container">
+            <div className="refresh-progress-bar">
+              <div 
+                className="refresh-progress-fill"
+                style={{ 
+                  width: progress.total > 0 ? `${(progress.current / progress.total) * 100}%` : '0%'
+                }}
+              ></div>
+            </div>
+            <div className="refresh-progress-text">
+              {progress.total > 0 ? `${progress.current} de ${progress.total} etapas concluídas` : 'Iniciando...'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Componente de gerenciamento de usuários
 const UserManagement = ({
   users,
@@ -5644,33 +5677,37 @@ initializeApp();
 
   // Função para aplicar filtros de técnico (memoizada)
   const getFilteredTechnicianGroups = React.useCallback((technician) => {
+    // Definir seções padrão que sempre devem aparecer
+    const standardSections = ['Em serviço', 'Previsto para hoje', 'Previstas para amanhã', 'Futura'];
+    
     if (!technicianGroups[technician] || !technicianFilters[technician]) {
       // Aplicar apenas o filtro de busca quando não há filtros de técnico
       const technicianData = technicianGroups[technician] || {};
       const filteredData = {};
-      Object.keys(technicianData).forEach(groupName => {
-        const filteredOrders = filterOrdersBySearch(technicianData[groupName], searchTerm);
-        if (filteredOrders.length > 0) {
-          filteredData[groupName] = filteredOrders;
-        }
+      
+      // Garantir que todas as seções padrão apareçam, mesmo vazias
+      standardSections.forEach(sectionName => {
+        const sectionOrders = technicianData[sectionName] || [];
+        filteredData[sectionName] = filterOrdersBySearch(sectionOrders, searchTerm);
       });
+      
       return filteredData;
     }
 
     const filtered = {};
-    Object.entries(technicianGroups[technician]).forEach(([groupName, orders]) => {
+    
+    // Garantir que todas as seções padrão apareçam, mesmo vazias
+    standardSections.forEach(groupName => {
+      const orders = technicianGroups[technician][groupName] || [];
+      
       // "Em serviço" sempre aparece
       if (groupName === 'Em serviço') {
         filtered[groupName] = filterOrdersBySearch(orders, searchTerm);
       } else if (technicianFilters[technician][groupName]) {
         filtered[groupName] = filterOrdersBySearch(orders, searchTerm);
-      }
-    });
-    
-    // Remover grupos vazios após aplicar o filtro de busca
-    Object.keys(filtered).forEach(groupName => {
-      if (filtered[groupName].length === 0) {
-        delete filtered[groupName];
+      } else {
+        // Mesmo sem filtro ativo, mostrar seção vazia para permitir drag & drop
+        filtered[groupName] = [];
       }
     });
     
@@ -6065,7 +6102,7 @@ initializeApp();
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 30000 // 30 segundos de timeout
+          timeout: 45000 // 45 segundos de timeout (50% a mais)
         });
         console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
         
@@ -6121,7 +6158,7 @@ initializeApp();
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 30000 // 30 segundos de timeout
+          timeout: 45000 // 45 segundos de timeout (50% a mais)
         });
         console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
         
@@ -6815,7 +6852,7 @@ initializeApp();
                               <td className="order-cliente">{ordem.TB01008_NOME}</td>
                               <td className="order-equipamento">{equipamento}</td>
                               <td className="order-serie">{seriePatrimonio}</td>
-                              <td className="order-condicao">{ordem.TB01055_NOME || 'N/A'}</td>
+                              <td className="order-condicao" title={ordem.TB01055_NOME || 'N/A'}>{ordem.TB01055_NOME || 'N/A'}</td>
                               <td className="order-horario">{horarioRange}</td>
                               <td className="order-tempo">{tempo}</td>
                           <td className="order-actions">
@@ -12322,8 +12359,9 @@ initializeApp();
                   color: isRefreshing ? '#6c757d' : '#4a5568',
                   border: '1px solid #e2e8f0',
                   borderRadius: '6px',
-                  fontSize: '14px',
+                  fontSize: '12.6px',
                   fontWeight: '500',
+                  fontFamily: 'Sora, sans-serif',
                   cursor: isRefreshing ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -12361,50 +12399,7 @@ initializeApp();
             </div>
             </div>
 
-          {/* Indicador de progresso da atualização */}
-          {isRefreshing && refreshProgress.message && (
-            <div style={{
-              background: '#f8f9fa',
-              border: '1px solid #e9ecef',
-              borderRadius: '6px',
-              padding: '12px 16px',
-              margin: '12px 0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              color: '#495057'
-            }}>
-              <div style={{
-                width: '16px',
-                height: '16px',
-                border: '2px solid #7c4dff',
-                borderTop: '2px solid transparent',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '14px', fontWeight: '500', marginBottom: '4px' }}>
-                  {refreshProgress.message}
-                </div>
-                <div style={{ 
-                  background: '#e9ecef', 
-                  borderRadius: '3px', 
-                  height: '6px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ 
-                    background: '#7c4dff', 
-                    height: '100%',
-                    width: `${(refreshProgress.current / refreshProgress.total) * 100}%`,
-                    transition: 'width 0.3s ease'
-                  }}></div>
-                </div>
-                <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '2px' }}>
-                  {refreshProgress.current} de {refreshProgress.total} etapas concluídas
-                </div>
-              </div>
-            </div>
-          )}
+
 
           <div className="board-section">
             <div className="kanban-board">
@@ -13129,6 +13124,12 @@ initializeApp();
         hasError={loadingHasError}
         errorMessage={loadingErrorMessage}
         onContinue={() => setIsInitialLoading(false)}
+      />
+
+      {/* Modal de carregamento para atualização de dados */}
+      <RefreshLoadingModal 
+        isOpen={isRefreshing}
+        progress={refreshProgress}
       />
     </>
   );
