@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import './Login.css';
 
-const API_BASE_URL = 'http://localhost:3002';
+// Configuração dinâmica da API
+const getApiBaseUrl = () => {
+  // Se estamos em desenvolvimento (localhost), usar localhost:3002
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3002';
+  }
+  
+  // Se estamos sendo acessados externamente, usar o mesmo host/IP mas porta 3002
+  const protocol = window.location.protocol; // http: ou https:
+  const hostname = window.location.hostname; // IP ou domínio atual
+  
+  return `${protocol}//${hostname}:3002`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log para debug - mostrar qual URL da API está sendo usada
+console.log('🌐 LOGIN API_BASE_URL detectada:', API_BASE_URL);
+console.log('🌐 LOGIN window.location.hostname:', window.location.hostname);
+console.log('🌐 LOGIN window.location.protocol:', window.location.protocol);
 
 const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({

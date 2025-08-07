@@ -16,8 +16,26 @@ import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
 import Login from './Login';
 
-// Configuração da API
-const API_BASE_URL = 'http://localhost:3002';
+// Configuração dinâmica da API
+const getApiBaseUrl = () => {
+  // Se estamos em desenvolvimento (localhost), usar localhost:3002
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3002';
+  }
+  
+  // Se estamos sendo acessados externamente, usar o mesmo host/IP mas porta 3002
+  const protocol = window.location.protocol; // http: ou https:
+  const hostname = window.location.hostname; // IP ou domínio atual
+  
+  return `${protocol}//${hostname}:3002`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log para debug - mostrar qual URL da API está sendo usada
+console.log('🌐 API_BASE_URL detectada:', API_BASE_URL);
+console.log('🌐 window.location.hostname:', window.location.hostname);
+console.log('🌐 window.location.protocol:', window.location.protocol);
 
 // Mock data removido - agora usando dados reais da base de dados
 
