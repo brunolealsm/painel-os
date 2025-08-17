@@ -6038,6 +6038,52 @@ initializeApp();
     );
   };
 
+  // Função utilitária para requisições com retry e timeout aumentado
+  const fetchWithRetry = async (url, options = {}, description = 'requisição') => {
+    const maxAttempts = 2; // Reduzir para 2 tentativas
+    const timeoutMs = 45000; // 45 segundos (menor que o backend de 30s + 15s buffer)
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        console.log(`📡 Tentativa ${attempt}/${maxAttempts} para ${description}`);
+        
+        // Criar AbortController para timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.log(`⏰ Timeout de ${timeoutMs}ms atingido na tentativa ${attempt} para ${description}`);
+        }, timeoutMs);
+        
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        return response; // Sucesso, retornar resposta
+        
+      } catch (error) {
+        lastError = error;
+        console.error(`❌ Erro na tentativa ${attempt} para ${description}:`, error);
+        
+        // Se é um erro de abort (timeout), ou se é a última tentativa
+        if (error.name === 'AbortError') {
+          console.log(`⏰ Timeout na tentativa ${attempt}${attempt < maxAttempts ? ', retentando em 2 segundos...' : ''}`);
+        }
+        
+        if (attempt === maxAttempts) {
+          throw error; // Última tentativa falhou
+        }
+        
+        // Aguardar 5 segundos antes da próxima tentativa (tempo para o banco se recuperar)
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    throw lastError || new Error('Falha em todas as tentativas de conexão');
+  };
+
   // Componente do modal do roteiro de hoje
   const TodayRouteModal = ({ technician, isOpen, onClose }) => {
     // Estados para o sidebar de detalhes
@@ -6059,6 +6105,7 @@ initializeApp();
     const [showSequenceInput, setShowSequenceInput] = useState(null);
     const [sequenceInputValue, setSequenceInputValue] = useState('');
     const [isReordering, setIsReordering] = useState(false);
+    const [retryAttempt, setRetryAttempt] = useState(0);
     
     // Estados para modal de detalhes
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -6122,13 +6169,55 @@ initializeApp();
           console.error('🧪 Erro no teste de conectividade:', testError);
         }
         
-        const response = await fetch(`${API_BASE_URL}/api/orders/today-route/${technicianId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 45000 // 45 segundos de timeout (50% a mais)
-        });
+        // Implementar retry com timeout aumentado
+        const maxAttempts = 3;
+        const timeoutMs = 60000; // 60 segundos
+        let lastError;
+        let response;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            console.log(`📡 Tentativa ${attempt}/${maxAttempts} para buscar roteiro de hoje`);
+            
+            // Criar AbortController para timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              controller.abort();
+              console.log(`⏰ Timeout de ${timeoutMs}ms atingido na tentativa ${attempt}`);
+            }, timeoutMs);
+            
+            response = await fetch(`${API_BASE_URL}/api/orders/today-route/${technicianId}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            break; // Sucesso, sair do loop
+            
+          } catch (error) {
+            lastError = error;
+            console.error(`❌ Erro na tentativa ${attempt}:`, error);
+            
+            // Se é um erro de abort (timeout), ou se é a última tentativa
+            if (error.name === 'AbortError') {
+              console.log(`⏰ Timeout na tentativa ${attempt}${attempt < maxAttempts ? ', retentando em 2 segundos...' : ''}`);
+            }
+            
+            if (attempt === maxAttempts) {
+              throw error; // Última tentativa falhou
+            }
+            
+            // Aguardar 2 segundos antes da próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        
+        if (!response) {
+          throw lastError || new Error('Falha em todas as tentativas de conexão');
+        }
         console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
         
         if (!response.ok) {
@@ -6153,7 +6242,9 @@ initializeApp();
         console.error('❌ Tipo do erro:', error.constructor.name);
         
         let errorMessage = error.message;
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        if (error.name === 'AbortError') {
+          errorMessage = `Timeout: A consulta está demorando mais que o esperado (mais de 60 segundos). Tente novamente em alguns instantes.`;
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
           errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
         }
         
@@ -6178,13 +6269,56 @@ initializeApp();
         console.log('🔄 Buscando ordens concluídas para técnico:', technicianId);
         console.log(`🔍 URL completa: ${API_BASE_URL}/api/orders/completed-route/${technicianId}`);
         
-        const response = await fetch(`${API_BASE_URL}/api/orders/completed-route/${technicianId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 45000 // 45 segundos de timeout (50% a mais)
-        });
+        // Implementar retry com timeout aumentado
+        const maxAttempts = 3;
+        const timeoutMs = 60000; // 60 segundos
+        let lastError;
+        let response;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            console.log(`📡 Tentativa ${attempt}/${maxAttempts} para buscar ordens concluídas`);
+            
+            // Criar AbortController para timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              controller.abort();
+              console.log(`⏰ Timeout de ${timeoutMs}ms atingido na tentativa ${attempt}`);
+            }, timeoutMs);
+            
+            response = await fetch(`${API_BASE_URL}/api/orders/completed-route/${technicianId}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            break; // Sucesso, sair do loop
+            
+          } catch (error) {
+            lastError = error;
+            console.error(`❌ Erro na tentativa ${attempt}:`, error);
+            
+            // Se é um erro de abort (timeout), ou se é a última tentativa
+            if (error.name === 'AbortError') {
+              console.log(`⏰ Timeout na tentativa ${attempt}${attempt < maxAttempts ? ', retentando em 2 segundos...' : ''}`);
+            }
+            
+            if (attempt === maxAttempts) {
+              throw error; // Última tentativa falhou
+            }
+            
+            // Aguardar 2 segundos antes da próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+        
+        if (!response) {
+          throw lastError || new Error('Falha em todas as tentativas de conexão');
+        }
+        
         console.log(`📡 Status da resposta: ${response.status} ${response.statusText}`);
         
         if (!response.ok) {
@@ -6209,7 +6343,9 @@ initializeApp();
         console.error('❌ Tipo do erro:', error.constructor.name);
         
         let errorMessage = error.message;
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        if (error.name === 'AbortError') {
+          errorMessage = `Timeout: A consulta está demorando mais que o esperado (mais de 60 segundos). Tente novamente em alguns instantes.`;
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
           errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
         }
         
@@ -6420,7 +6556,8 @@ initializeApp();
 
     // Função para obter número da ordem com cor
     const getOrderNumber = (ordem) => {
-      if (ordem.TB02115_ORDEM === 0) {
+      // Verificar se a ordem não tem sequência definida (null, undefined, 0, ou string vazia)
+      if (!ordem.TB02115_ORDEM || ordem.TB02115_ORDEM === 0 || ordem.TB02115_ORDEM === '0') {
         return { number: '-', isRed: true };
       }
       return { number: ordem.TB02115_ORDEM, isRed: false };
@@ -6446,7 +6583,148 @@ initializeApp();
       return 'N/A';
     };
 
-    // Função para reordenar itens
+    // Função para atualizar sequência individual de uma ordem
+    const updateSequence = async (osCode, newSequence) => {
+      try {
+        setIsReordering(true);
+        setRetryAttempt(0);
+        
+        // Obter ID do técnico
+        const technicianId = getTechnicianIdByName(technician);
+        if (!technicianId) {
+          throw new Error(`ID do técnico ${technician} não encontrado`);
+        }
+        
+        console.log('🔄 Iniciando atualização de sequência...');
+        console.log('📋 OS Code:', osCode);
+        console.log('📊 Nova sequência:', newSequence);
+        console.log('👤 ID do técnico:', technicianId);
+        console.log('🔗 URL da API:', `${API_BASE_URL}/api/orders/update-sequence`);
+        
+        const requestBody = {
+          technicianId,
+          osCode,
+          newSequence
+        };
+        
+        console.log('📤 Body da requisição:', JSON.stringify(requestBody, null, 2));
+        
+        // Fazer requisição com retry customizado - versão com reorganização
+        const maxAttempts = 2;
+        const timeoutMs = 40000; // 40 segundos (compatível com backend de 30s)
+        let lastError;
+        let response;
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            setRetryAttempt(attempt);
+            console.log(`📡 Tentativa ${attempt}/${maxAttempts} para atualização de sequência`);
+            
+            // Criar AbortController para timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+              controller.abort();
+              console.log(`⏰ Timeout de ${timeoutMs}ms atingido na tentativa ${attempt}`);
+            }, timeoutMs);
+            
+            response = await fetch(`${API_BASE_URL}/api/orders/update-sequence`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(requestBody),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            break; // Sucesso, sair do loop
+            
+          } catch (error) {
+            lastError = error;
+            console.error(`❌ Erro na tentativa ${attempt}:`, error);
+            
+            if (error.name === 'AbortError') {
+              console.log(`⏰ Timeout na tentativa ${attempt}${attempt < maxAttempts ? ', retentando em 5 segundos...' : ''}`);
+            }
+            
+            if (attempt === maxAttempts) {
+              throw error; // Última tentativa falhou
+            }
+            
+            // Aguardar 5 segundos antes da próxima tentativa
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+        }
+        
+        if (!response) {
+          throw lastError || new Error('Falha em todas as tentativas de conexão');
+        }
+        
+        console.log('📡 Status da resposta:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Resposta de erro da API:', errorText);
+          throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log('📊 Resultado da API:', result);
+        
+        if (!result.success) {
+          throw new Error(result.message || 'Erro ao atualizar sequência');
+        }
+        
+        console.log('✅ Sequência atualizada com sucesso!');
+        
+        // Mostrar informações sobre reorganização se presente
+        if (result.data && result.data.note) {
+          console.log('ℹ️ Nota:', result.data.note);
+        }
+        if (result.data && result.data.conflictsResolved > 0) {
+          console.log(`🔄 Reorganização automática: ${result.data.conflictsResolved} ordem(s) reordenada(s)`);
+        }
+        
+        // Recarregar dados
+        console.log('🔄 Recarregando dados do roteiro...');
+        await fetchTodayRoute();
+        console.log('✅ Dados recarregados com sucesso!');
+        
+      } catch (error) {
+        console.error('❌ Erro ao atualizar sequência:', error);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Tipo do erro:', error.constructor.name);
+        
+        let errorMessage = error.message;
+        let shouldRetry = false;
+        
+        if (error.name === 'AbortError') {
+          errorMessage = `Timeout: A operação está demorando mais que o esperado (mais de 60 segundos). Tente novamente em alguns instantes.`;
+          shouldRetry = true;
+        } else if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
+          shouldRetry = true;
+        } else if (error.message.includes('408')) {
+          errorMessage = `Timeout na operação - tente novamente em alguns segundos.`;
+          shouldRetry = true;
+        } else if (error.message.includes('409')) {
+          errorMessage = `Conflito de concorrência - aguarde alguns segundos e tente novamente.`;
+          shouldRetry = true;
+        } else if (error.message.includes('503')) {
+          errorMessage = `Conexão com o banco foi perdida - tente novamente.`;
+          shouldRetry = true;
+        }
+        
+        console.log(`⚠️ Erro identificado - Pode tentar novamente: ${shouldRetry}`);
+        setRouteError(`Erro ao definir ordem: ${errorMessage}`);
+        throw error; // Re-throw para que a função chamadora possa tratar
+      } finally {
+        setIsReordering(false);
+        setRetryAttempt(0);
+      }
+    };
+
+    // Função para reordenar itens (mantida para compatibilidade com drag & drop)
     const reorderItems = async (reorderedData) => {
       try {
         setIsReordering(true);
@@ -6457,33 +6735,63 @@ initializeApp();
           throw new Error(`ID do técnico ${technician} não encontrado`);
         }
         
-        console.log('🔄 Enviando reordenação:', reorderedData);
+        console.log('🔄 Iniciando reordenação de sequência...');
+        console.log('📋 Dados para reordenação:', reorderedData);
+        console.log('👤 ID do técnico:', technicianId);
+        console.log('🔗 URL da API:', `${API_BASE_URL}/api/orders/reorder-sequence`);
         
-        const response = await fetch('/api/orders/reorder-sequence', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
+        const requestBody = {
+          technicianId,
+          reorderedItems: reorderedData
+        };
+        
+        console.log('📤 Body da requisição:', JSON.stringify(requestBody, null, 2));
+        
+        const response = await fetchWithRetry(
+          `${API_BASE_URL}/api/orders/reorder-sequence`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
           },
-          body: JSON.stringify({
-            technicianId,
-            reorderedItems: reorderedData
-          })
-        });
+          'reordenação de sequência'
+        );
+        
+        console.log('📡 Status da resposta:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ Resposta de erro da API:', errorText);
+          throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const result = await response.json();
+        console.log('📊 Resultado da API:', result);
         
         if (!result.success) {
           throw new Error(result.message || 'Erro ao reordenar sequências');
         }
         
-        console.log('✅ Reordenação concluída:', result);
+        console.log('✅ Reordenação concluída com sucesso!');
         
         // Recarregar dados
+        console.log('🔄 Recarregando dados do roteiro...');
         await fetchTodayRoute();
+        console.log('✅ Dados recarregados com sucesso!');
         
       } catch (error) {
         console.error('❌ Erro ao reordenar:', error);
-        setRouteError(error.message);
+        console.error('❌ Stack trace:', error.stack);
+        console.error('❌ Tipo do erro:', error.constructor.name);
+        
+        let errorMessage = error.message;
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          errorMessage = `Erro de conexão com o servidor (${API_BASE_URL})`;
+        }
+        
+        setRouteError(`Erro ao definir ordem: ${errorMessage}`);
       } finally {
         setIsReordering(false);
       }
@@ -6554,43 +6862,49 @@ initializeApp();
 
     // Função para salvar nova sequência
     const handleSaveSequence = async () => {
-      if (!showSequenceInput || !sequenceInputValue) return;
-      
-      const newSequence = parseInt(sequenceInputValue);
-      if (isNaN(newSequence) || newSequence < 1) {
-        alert('Por favor, digite um número válido maior que 0');
-        return;
-      }
-      
-      // Encontrar a ordem
-      const ordem = routeData.find(item => item.TB02115_CODIGO === showSequenceInput);
-      if (!ordem) return;
-      
-      // Calcular reordenações necessárias
-      const roteirizadas = routeData.filter(item => item.Tipo === 'Roteirizado');
-      const maxSequence = roteirizadas.length;
-      
-      const targetSequence = Math.min(newSequence, maxSequence + 1);
-      
-      const reorderedItems = [{
-        osCode: ordem.TB02115_CODIGO,
-        newSequence: targetSequence
-      }];
-      
-      // Ajustar sequências de outras ordens se necessário
-      roteirizadas.forEach((item) => {
-        if (item.TB02115_ORDEM >= targetSequence) {
-          reorderedItems.push({
-            osCode: item.TB02115_CODIGO,
-            newSequence: item.TB02115_ORDEM + 1
-          });
+      try {
+        console.log('🔄 Iniciando salvamento de sequência...');
+        console.log('📋 showSequenceInput:', showSequenceInput);
+        console.log('📋 sequenceInputValue:', sequenceInputValue);
+        
+        if (!showSequenceInput || !sequenceInputValue) {
+          console.log('❌ Dados insuficientes para salvar sequência');
+          return;
         }
-      });
-      
-      await reorderItems(reorderedItems);
-      
-      setShowSequenceInput(null);
-      setSequenceInputValue('');
+        
+        const newSequence = parseInt(sequenceInputValue);
+        if (isNaN(newSequence) || newSequence < 1) {
+          alert('Por favor, digite um número válido maior que 0');
+          return;
+        }
+        
+        console.log('📊 Nova sequência solicitada:', newSequence);
+        
+        // Encontrar a ordem
+        const ordem = routeData.find(item => item.TB02115_CODIGO === showSequenceInput);
+        if (!ordem) {
+          console.error('❌ Ordem não encontrada nos dados:', showSequenceInput);
+          alert('Erro: Ordem de serviço não encontrada');
+          return;
+        }
+        
+        console.log('📋 Ordem encontrada:', {
+          codigo: ordem.TB02115_CODIGO,
+          tipo: ordem.Tipo,
+          ordemAtual: ordem.TB02115_ORDEM
+        });
+        
+        // Chamar função para atualizar sequência
+        await updateSequence(ordem.TB02115_CODIGO, newSequence);
+        
+        console.log('✅ Sequência salva com sucesso!');
+        setShowSequenceInput(null);
+        setSequenceInputValue('');
+        
+      } catch (error) {
+        console.error('❌ Erro ao salvar sequência:', error);
+        alert(`Erro ao definir ordem: ${error.message}`);
+      }
     };
 
     // Dados mock para teste visual
@@ -6714,6 +7028,16 @@ initializeApp();
                   </div>
                 )}
                 
+                {isReordering && (
+                  <div className="loading-indicator processing">
+                    <i className="bi bi-arrow-repeat spin"></i>
+                    <span>
+                      Atualizando sequências... Por favor, aguarde.
+                      {retryAttempt > 1 && ` (Tentativa ${retryAttempt}/2)`}
+                    </span>
+                  </div>
+                )}
+                
                 {routeError && (
                   <div className="error-message">
                     <i className="bi bi-exclamation-triangle"></i>
@@ -6722,7 +7046,7 @@ initializeApp();
                 )}
                 
                 {!isLoadingRoute && !routeError && (
-                <div className="route-table-container">
+                <div className="route-table-container" style={{ opacity: isReordering ? 0.6 : 1, pointerEvents: isReordering ? 'none' : 'auto' }}>
                   <table className="route-table">
                     <thead>
                       <tr>
@@ -6762,13 +7086,14 @@ initializeApp();
                                       value={sequenceInputValue}
                                       onChange={(e) => setSequenceInputValue(e.target.value)}
                                       onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSaveSequence();
-                                        if (e.key === 'Escape') setShowSequenceInput(null);
+                                        if (e.key === 'Enter' && !isReordering) handleSaveSequence();
+                                        if (e.key === 'Escape' && !isReordering) setShowSequenceInput(null);
                                       }}
                                       className="sequence-input"
                                       placeholder="Seq."
                                       min="1"
                                       autoFocus
+                                      disabled={isReordering}
                                     />
                                     <button 
                                       onClick={(e) => {
@@ -6776,15 +7101,23 @@ initializeApp();
                                         handleSaveSequence();
                                       }}
                                       className="sequence-save-btn"
+                                      disabled={isReordering}
+                                      title={isReordering ? "Processando..." : "Confirmar ordem"}
                                     >
-                                      ✓
+                                      {isReordering ? (
+                                        <i className="bi bi-arrow-repeat spin" style={{ fontSize: '10px' }}></i>
+                                      ) : (
+                                        "✓"
+                                      )}
                                     </button>
                                     <button 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setShowSequenceInput(null);
+                                        if (!isReordering) setShowSequenceInput(null);
                                       }}
                                       className="sequence-cancel-btn"
+                                      disabled={isReordering}
+                                      title={isReordering ? "Processando..." : "Cancelar"}
                                     >
                                       ×
                                     </button>
@@ -8043,14 +8376,7 @@ initializeApp();
           const hasMapRoutedOrders = orders.some(order => isOrderInMapRoute(order));
           const hasAlreadyRoutedOrders = orders.some(order => order.isRouted && order.routeSequence);
           
-          // Debug para marcadores problemáticos
-          if (orders.length > 0) {
-            const firstOrder = orders[0];
-            const orderId = firstOrder.id || firstOrder.TB02115_CODIGO;
-            if (hasAlreadyRoutedOrders) {
-              console.log(`🟢 Marcador verde para ${locationKey} (${orderId}): ${orders.length} ordens, ${orders.filter(o => o.isRouted).length} roteirizadas`);
-            }
-          }
+
           
           // Definir cor do marcador baseado no status (priorizar ordens roteirizadas)
           let markerColor = '#ef4444'; // Vermelho para não roteirizadas
@@ -8210,14 +8536,7 @@ initializeApp();
           const hasMapRoutedOrders = orders.some(order => isOrderInMapRoute(order));
           const hasAlreadyRoutedOrders = orders.some(order => order.isRouted && order.routeSequence);
           
-          // Debug para marcadores problemáticos
-          if (orders.length > 0) {
-            const firstOrder = orders[0];
-            const orderId = firstOrder.id || firstOrder.TB02115_CODIGO;
-            if (hasAlreadyRoutedOrders) {
-              console.log(`🟢 Marcador verde para ${locationKey} (${orderId}): ${orders.length} ordens, ${orders.filter(o => o.isRouted).length} roteirizadas`);
-            }
-          }
+
           
           // Definir cor do marcador baseado no status (priorizar ordens roteirizadas)
           let markerColor = '#ef4444'; // Vermelho para não roteirizadas

@@ -8397,6 +8397,22 @@ body {
   background-color: #dc2626;
 }
 
+/* Indicador de processamento de sequências */
+.loading-indicator.processing {
+  background-color: #fef3c7;
+  border: 1px solid #f59e0b;
+  color: #92400e;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-weight: 500;
+}
+
+.loading-indicator.processing i {
+  color: #f59e0b;
+  margin-right: 8px;
+}
+
 /* Estilos para o modal de detalhes */
 .details-modal-overlay {
   position: fixed;
