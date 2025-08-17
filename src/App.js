@@ -1458,6 +1458,11 @@ function App() {
   const [routeModalLoading, setRouteModalLoading] = useState(false);
   const [routeModalError, setRouteModalError] = useState(null);
   
+  // Estados para operações de drag & drop
+  const [isDragDropProcessing, setIsDragDropProcessing] = useState(false);
+  const [dragDropProgress, setDragDropProgress] = useState({ current: 0, total: 0 });
+  const [dragDropMessage, setDragDropMessage] = useState('');
+  
   // Ref e estado para preservar posição do scroll da coluna Em Aberto
   const openColumnScrollRef = useRef(null);
   const lastScrollPosition = useRef(0);
@@ -3710,6 +3715,11 @@ initializeApp();
       return;
     }
     
+    // Ativar feedback visual imediato
+    setIsDragDropProcessing(true);
+    setDragDropProgress({ current: 0, total: selectedOrders.length });
+    setDragDropMessage(`Movendo ${selectedOrders.length} ordens de "${fromGroup}" para "${toGroup}"...`);
+    
     try {
       console.log(`🎯 Movendo ${selectedOrders.length} ordens do técnico "${technicianName}" de "${fromGroup}" para "${toGroup}"`);
       
@@ -3724,14 +3734,25 @@ initializeApp();
         technicianId: technicianId
       };
       
+      // Atualizar progresso
+      setDragDropProgress({ current: 1, total: selectedOrders.length });
+      setDragDropMessage('Atualizando status no banco de dados...');
+      
+      // AbortController para timeout de 60 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
+      
       // Fazer chamada da API para atualizar status no banco de dados
       const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const result = await response.json();
       
@@ -3898,11 +3919,17 @@ initializeApp();
     } catch (error) {
       console.error('❌ Erro na requisição de movimentação entre seções:', error);
       
+      // Verificar se é erro de timeout
+      const isTimeoutError = error.name === 'AbortError' || error.message.includes('timeout');
+      const errorMessage = isTimeoutError 
+        ? 'Timeout na operação - a operação está demorando mais que o esperado. Tente novamente em alguns segundos.'
+        : error.message;
+      
       // Criar resultados de erro para o modal
       const errorResults = selectedOrders.map(orderId => ({
         orderId,
         status: 'error',
-        errorMessage: error.message,
+        errorMessage: errorMessage,
         cliente: 'N/A',
         tecnico: technicianName,
         targetSection: toGroup
@@ -3914,6 +3941,11 @@ initializeApp();
         technicianName: technicianName
       });
       setShowOrderStatusModal(true);
+    } finally {
+      // Sempre desativar o loading independente do resultado
+      setIsDragDropProcessing(false);
+      setDragDropProgress({ current: 0, total: 0 });
+      setDragDropMessage('');
     }
   };
 
@@ -3934,6 +3966,11 @@ initializeApp();
       return;
     }
     
+    // Ativar feedback visual imediato
+    setIsDragDropProcessing(true);
+    setDragDropProgress({ current: 0, total: selectedOrders.length });
+    setDragDropMessage(`Movendo ${selectedOrders.length} ordens para "${groupName}" do técnico "${technicianName}"...`);
+    
     try {
       console.log(`🎯 Atualizando ${selectedOrders.length} ordens para seção "${groupName}" do técnico "${technicianName}"`);
       
@@ -3948,14 +3985,25 @@ initializeApp();
         technicianId: technicianId
       };
       
+      // Atualizar progresso
+      setDragDropProgress({ current: 1, total: selectedOrders.length });
+      setDragDropMessage('Atualizando status no banco de dados...');
+      
+      // AbortController para timeout de 60 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
+      
       // Fazer chamada da API para atualizar status no banco de dados
       const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const result = await response.json();
       
@@ -4080,9 +4128,15 @@ initializeApp();
     } catch (error) {
       console.error('❌ Erro na chamada da API de atualização:', error);
       
+      // Verificar se é erro de timeout
+      const isTimeoutError = error.name === 'AbortError' || error.message.includes('timeout');
+      const errorMessage = isTimeoutError 
+        ? 'Timeout na operação - a operação está demorando mais que o esperado. Tente novamente em alguns segundos.'
+        : `Erro de conexão: ${error.message}`;
+      
       // Criar resultados de erro para o modal
       const errorResults = selectedOrders.map(orderId => {
-        let orderData = { orderId, status: 'error', errorMessage: `Erro de conexão: ${error.message}` };
+        let orderData = { orderId, status: 'error', errorMessage: errorMessage };
         
         // Buscar dados da ordem para o modal
         availableOrdersState.forEach(cityGroup => {
@@ -4103,6 +4157,11 @@ initializeApp();
         technicianName: technicianName
       });
       setShowOrderStatusModal(true);
+    } finally {
+      // Sempre desativar o loading independente do resultado
+      setIsDragDropProcessing(false);
+      setDragDropProgress({ current: 0, total: 0 });
+      setDragDropMessage('');
     }
   };
 
@@ -4111,6 +4170,11 @@ initializeApp();
     // Garantir que orderIds seja sempre um array
     const orderIdsArray = Array.isArray(orderIds) ? orderIds : [orderIds];
     console.log(`🔄 handleReturnToOpen chamado para ${orderIdsArray.length} ordens:`, orderIdsArray);
+    
+    // Ativar feedback visual imediato
+    setIsDragDropProcessing(true);
+    setDragDropProgress({ current: 0, total: orderIdsArray.length });
+    setDragDropMessage(`Retornando ${orderIdsArray.length} ordens para "Em Aberto"...`);
     
     try {
       console.log(`🎯 Atualizando ${orderIdsArray.length} ordens para status "Em Aberto"`);
@@ -4122,14 +4186,25 @@ initializeApp();
         technicianId: null // Não há técnico para "Em Aberto"
       };
       
+      // Atualizar progresso
+      setDragDropProgress({ current: 1, total: orderIdsArray.length });
+      setDragDropMessage('Atualizando status no banco de dados...');
+      
+      // AbortController para timeout de 60 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
+      
       // Fazer chamada da API para atualizar status no banco de dados
       const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
       
       const result = await response.json();
       
@@ -4397,11 +4472,17 @@ initializeApp();
     } catch (error) {
       console.error('❌ Erro na requisição de retorno para "Em Aberto":', error);
       
+      // Verificar se é erro de timeout
+      const isTimeoutError = error.name === 'AbortError' || error.message.includes('timeout');
+      const errorMessage = isTimeoutError 
+        ? 'Timeout na operação - a operação está demorando mais que o esperado. Tente novamente em alguns segundos.'
+        : error.message;
+      
       // Criar resultados de erro para o modal
       const errorResults = orderIdsArray.map(orderId => ({
         orderId,
         status: 'error',
-        errorMessage: error.message,
+        errorMessage: errorMessage,
         cliente: 'N/A'
       }));
       
@@ -4411,6 +4492,11 @@ initializeApp();
         technicianName: null
       });
       setShowOrderStatusModal(true);
+    } finally {
+      // Sempre desativar o loading independente do resultado
+      setIsDragDropProcessing(false);
+      setDragDropProgress({ current: 0, total: 0 });
+      setDragDropMessage('');
     }
   };
 
@@ -5676,10 +5762,11 @@ initializeApp();
         technicianKeys.forEach(technician => {
           if (!prev[technician]) {
             hasChanges = true;
+            // Todas as seções vêm habilitadas por padrão - usuário pode filtrar depois se quiser
             newFilters[technician] = {
               'Previsto para hoje': true,
-              'Previstas para amanhã': false,
-              'Futura': false
+              'Previstas para amanhã': true,
+              'Futura': true
             };
           }
         });
@@ -13017,7 +13104,30 @@ initializeApp();
             </div>
             </div>
 
-
+            {/* Indicador de loading para operações de drag & drop */}
+            {isDragDropProcessing && (
+              <div className="drag-drop-loading-overlay">
+                <div className="drag-drop-loading-modal">
+                  <div className="loading-spinner"></div>
+                  <div className="loading-text">
+                    <h3>{dragDropMessage}</h3>
+                    {dragDropProgress.total > 0 && (
+                      <div className="progress-info">
+                        <div className="progress-bar">
+                          <div 
+                            className="progress-fill" 
+                            style={{ width: `${(dragDropProgress.current / dragDropProgress.total) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="progress-text">
+                          {dragDropProgress.current} de {dragDropProgress.total} processadas
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
           <div className="board-section">
             <div className="kanban-board">
