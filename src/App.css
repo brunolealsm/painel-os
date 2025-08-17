@@ -509,6 +509,28 @@ body {
   z-index: 1;
 }
 
+/* Quando uma ordem está sendo arrastada, impedir efeitos visuais na coluna */
+.technician-column:has(.technician-order-row:active) {
+  transform: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Quando uma ordem está sendo arrastada, desabilitar completamente o drag da coluna */
+.technician-column.dragging-order {
+  cursor: default !important;
+  transform: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-color: #e2e8f0 !important;
+  pointer-events: auto; /* Manter pointer events para as ordens internas */
+}
+
+.technician-column.dragging-order:hover {
+  transform: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-color: #e2e8f0 !important;
+}
+
 /* Quando o filtro estiver aberto, reduzir z-index do hover para não interferir */
 .technician-column:hover:has(.technician-filter-container .column-filter-overlay) {
   z-index: 0;

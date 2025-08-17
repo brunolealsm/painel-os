@@ -2800,66 +2800,64 @@ initializeApp();
     
     // Quando uma área é selecionada/desmarcada, sincronizar técnicos automaticamente
     if (type === 'area') {
+      console.log('🎯 ÁREA: Aplicando filtros automáticos para áreas:', newSelection);
       const technicosToAdd = [];
       
       // Para cada área selecionada, obter todos os técnicos vinculados
       newSelection.forEach(areaNome => {
         const area = teamData.areas.find(a => a.nome === areaNome);
+        console.log(`🔍 ÁREA: Procurando área "${areaNome}":`, area);
         if (area) {
           const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
+          console.log(`🔍 ÁREA: Técnicos da área "${areaNome}":`, tecnicosFromArea.map(t => t.nome));
           tecnicosFromArea.forEach(tec => {
             if (!technicosToAdd.includes(tec.nome)) {
               technicosToAdd.push(tec.nome);
             }
           });
+        } else {
+          console.log(`⚠️ ÁREA: Área "${areaNome}" não encontrada!`);
         }
       });
       
-      // Manter técnicos já selecionados manualmente (que não pertencem às áreas desmarcadas)
-      const areasRemovidas = selectedFilterItems.area.filter(a => !newSelection.includes(a));
-      let technicosToRemove = [];
+      // NOVA LÓGICA SIMPLIFICADA: 
+      // Quando áreas são selecionadas, mostrar APENAS técnicos das áreas selecionadas
+      // Ignorar técnicos de coordenadores previamente selecionados
       
-      areasRemovidas.forEach(areaNome => {
-        const area = teamData.areas.find(a => a.nome === areaNome);
-        if (area) {
-          const tecnicosFromArea = teamData.tecnicos.filter(tec => tec.areaId === area.id);
-          tecnicosFromArea.forEach(tec => {
-            // Só remover se o técnico não pertence a outras áreas/coordenadores ainda selecionados
-            const pertenceAOutraAreaSelecionada = selectedFilterItems.area.some(otherAreaNome => {
-              if (otherAreaNome === areaNome) return false;
-              const otherArea = teamData.areas.find(a => a.nome === otherAreaNome);
-              return otherArea && teamData.tecnicos.some(t => t.areaId === otherArea.id && t.nome === tec.nome);
-            });
-            
-            const pertenceACoordSelecionado = selectedFilterItems.coordenador.some(coordNome => {
-              const coord = teamData.coordenadores.find(c => c.nome === coordNome);
-              if (!coord) return false;
-              const coordAreas = teamData.areas.filter(a => a.coordenadorId === coord.id);
-              return coordAreas.some(coordArea => 
-                teamData.tecnicos.some(t => t.areaId === coordArea.id && t.nome === tec.nome)
-              );
-            });
-            
-            if (!pertenceAOutraAreaSelecionada && !pertenceACoordSelecionado && !technicosToRemove.includes(tec.nome)) {
-              technicosToRemove.push(tec.nome);
-            }
-          });
-        }
-      });
+      console.log('🔄 ÁREA: Aplicando nova lógica simplificada');
       
-      // Criar nova lista de técnicos
-      const currentTechnicians = selectedFilterItems.tecnico || [];
-      const newTechnicians = [
-        ...currentTechnicians.filter(t => !technicosToRemove.includes(t)),
-        ...technicosToAdd.filter(t => !currentTechnicians.includes(t))
-      ];
+      // Se há coordenador selecionado E área selecionada: intersecção (técnicos da área que pertencem ao coordenador)
+      if (selectedFilterItems.coordenador.length > 0) {
+        console.log('🔄 ÁREA: Coordenador + Área - calculando intersecção');
+        const coordenadorNomes = selectedFilterItems.coordenador;
+        const coordenadorIds = teamData.coordenadores
+          .filter(coord => coordenadorNomes.includes(coord.nome))
+          .map(coord => coord.id);
+        
+        // Filtrar técnicos que estão nas áreas selecionadas E pertencem aos coordenadores selecionados
+        const newTechnicians = technicosToAdd.filter(tecnicoNome => {
+          const tecnico = teamData.tecnicos.find(t => t.nome === tecnicoNome);
+          if (!tecnico) return false;
+          
+          const areaDoTecnico = teamData.areas.find(a => a.id === tecnico.areaId);
+          return areaDoTecnico && coordenadorIds.includes(areaDoTecnico.coordenadorId);
+        });
+        
+        console.log('🔍 ÁREA: Técnicos na intersecção (área + coordenador):', newTechnicians);
+        updatedFilters.tecnico = newTechnicians;
+      } else {
+        // Se só há área selecionada: mostrar APENAS técnicos das áreas
+        console.log('🔄 ÁREA: Apenas área selecionada - substituindo lista completa');
+        updatedFilters.tecnico = technicosToAdd;
+      }
       
-      updatedFilters.tecnico = newTechnicians;
+      const newTechnicians = updatedFilters.tecnico;
       
-      console.log('🔍 Áreas selecionadas:', newSelection);
-      console.log('🔍 Técnicos adicionados automaticamente:', technicosToAdd);
-      console.log('🔍 Técnicos removidos automaticamente:', technicosToRemove);
-      console.log('🔍 Nova lista de técnicos:', newTechnicians);
+      console.log('🎯 ÁREA: Resultado final:');
+      console.log('🔍 ÁREA: Áreas selecionadas:', newSelection);
+      console.log('🔍 ÁREA: Técnicos das áreas selecionadas:', technicosToAdd);
+      console.log('🔍 ÁREA: Lista final de técnicos:', newTechnicians);
+      console.log('🔍 ÁREA: updatedFilters.tecnico:', updatedFilters.tecnico);
     }
     
     // Quando um técnico é selecionado/desmarcado diretamente, manter essa preferência
@@ -3178,14 +3176,18 @@ initializeApp();
         
         // Se há área selecionada, mostrar técnicos da área
         if (selectedFilterItems.area.length > 0) {
+          console.log('🎯 getFilterOptions(tecnico): Área selecionada, filtrando técnicos');
           const areaNomes = selectedFilterItems.area;
+          console.log('🔍 Áreas selecionadas:', areaNomes);
           const areaIds = teamData.areas
             .filter(area => areaNomes.includes(area.nome))
             .map(area => area.id);
+          console.log('🔍 IDs das áreas:', areaIds);
           
           let tecnicoOptions = teamData.tecnicos
             .filter(tec => areaIds.includes(tec.areaId))
             .map(tec => tec.nome);
+          console.log('🔍 Técnicos das áreas:', tecnicoOptions);
           
           // Adicionar técnicos com ordens mas não cadastrados (usando nomes reais)
           // IMPORTANTE: Só adicionar se o técnico pertencer à área selecionada
@@ -3215,6 +3217,7 @@ initializeApp();
             }
           });
           
+          console.log('🔍 Resultado final tecnicoOptions para área:', tecnicoOptions);
           return tecnicoOptions;
         }
         
@@ -3458,8 +3461,15 @@ initializeApp();
 
   // Função para obter técnicos baseado nos filtros aplicados usando relacionamentos da equipe
   const getFilteredTechnicians = React.useMemo(() => {
+    console.log('🎯 getFilteredTechnicians executado:');
+    console.log('🔍 hasActiveTeamFilters:', hasActiveTeamFilters);
+    console.log('🔍 selectedFilterItems.tecnico:', selectedFilterItems.tecnico);
+    console.log('🔍 selectedFilterItems.area:', selectedFilterItems.area);
+    console.log('🔍 selectedFilterItems.coordenador:', selectedFilterItems.coordenador);
+    
     // Se não há filtros de equipe ativos, não mostrar técnicos
     if (!hasActiveTeamFilters) {
+      console.log('🔍 Nenhum filtro ativo, retornando array vazio');
       return [];
     }
 
@@ -3468,13 +3478,9 @@ initializeApp();
     // os técnicos correspondentes são automaticamente marcados no filtro
     const filteredTechnicians = selectedFilterItems.tecnico || [];
 
-    // Logs apenas quando há mudanças significativas (não em todos os renders)
-    if (filteredTechnicians.length > 0) {
-      console.log('🔍 Técnicos filtrados (exatos do filtro):', filteredTechnicians);
-    }
-
+    console.log('🔍 Resultado getFilteredTechnicians:', filteredTechnicians);
     return filteredTechnicians;
-  }, [selectedFilterItems.tecnico, hasActiveTeamFilters]);
+  }, [selectedFilterItems.tecnico, hasActiveTeamFilters, selectedFilterItems.area, selectedFilterItems.coordenador]);
 
   // Alias para manter compatibilidade
   const getVisibleTechniques = getFilteredTechnicians;
@@ -3939,6 +3945,198 @@ initializeApp();
       setOrderStatusSummary({
         targetSection: toGroup,
         technicianName: technicianName
+      });
+      setShowOrderStatusModal(true);
+    } finally {
+      // Sempre desativar o loading independente do resultado
+      setIsDragDropProcessing(false);
+      setDragDropProgress({ current: 0, total: 0 });
+      setDragDropMessage('');
+    }
+  };
+
+  // Nova função para lidar com drops entre técnicos diferentes
+  const handleDropBetweenTechnicians = async (fromTechnicianName, toTechnicianName, toGroupName) => {
+    // Não permitir drop no grupo "Em serviço"
+    if (toGroupName === 'Em serviço') {
+      console.log('❌ Não é permitido arrastar para "Em serviço"');
+      return;
+    }
+    
+    // Se não há ordens selecionadas, não fazer nada
+    if (selectedOrders.length === 0) {
+      console.log('⚠️ Nenhuma ordem selecionada para arrastar');
+      return;
+    }
+    
+    // Ativar feedback visual imediato
+    setIsDragDropProcessing(true);
+    setDragDropProgress({ current: 0, total: selectedOrders.length });
+    setDragDropMessage(`Movendo ${selectedOrders.length} ordens do técnico "${fromTechnicianName}" para "${toGroupName}" do técnico "${toTechnicianName}"...`);
+    
+    try {
+      console.log(`🎯 Movendo ${selectedOrders.length} ordens de "${fromTechnicianName}" para seção "${toGroupName}" do técnico "${toTechnicianName}"`);
+      
+      // Obter ID do técnico de destino
+      const toTechnicianId = getTechnicianIdByName(toTechnicianName);
+      console.log(`🔍 ID do técnico de destino "${toTechnicianName}": ${toTechnicianId}`);
+      
+      // Objeto que será enviado para o backend
+      const requestPayload = {
+        orderIds: selectedOrders,
+        targetSection: toGroupName,
+        technicianId: toTechnicianId
+      };
+      
+      // Atualizar progresso
+      setDragDropProgress({ current: 1, total: selectedOrders.length });
+      setDragDropMessage('Atualizando status no banco de dados...');
+      
+      // AbortController para timeout de 60 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 segundos
+      
+      // Fazer chamada da API para atualizar status no banco de dados
+      const response = await fetch(`${API_BASE_URL}/api/orders/update-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      const result = await response.json();
+      
+      // Preparar dados para o modal
+      const orderResults = [];
+      
+      if (!result.success) {
+        console.error('❌ Erro ao atualizar status no banco:', result.message);
+        
+        // Buscar dados das ordens para o modal de erro
+        selectedOrders.forEach(orderId => {
+          let orderData = { orderId, status: 'error', errorMessage: result.message };
+          
+          // Buscar dados da ordem nos grupos de técnicos
+          Object.keys(technicianGroups).forEach(techName => {
+            Object.keys(technicianGroups[techName]).forEach(groupName => {
+              technicianGroups[techName][groupName].forEach(ordem => {
+                if (ordem.id === orderId) {
+                  orderData.cliente = ordem.cliente || ordem.TB01008_NOME;
+                }
+              });
+            });
+          });
+          
+          orderResults.push(orderData);
+        });
+        
+        // Mostrar modal com erro
+        setOrderStatusResults(orderResults);
+        setOrderStatusSummary({
+          targetSection: toGroupName,
+          technicianName: toTechnicianName
+        });
+        setShowOrderStatusModal(true);
+        return;
+      }
+      
+      console.log(`✅ Status atualizado no banco: ${result.message}`);
+      console.log('📊 Detalhes:', result.data);
+      
+      // Atualizar estado local - remover das seções do técnico origem e adicionar ao técnico destino
+      const newTechnicianGroups = { ...technicianGroups };
+      const ordersToMove = [];
+      
+      // Encontrar e remover ordens do técnico de origem
+      selectedOrders.forEach(orderId => {
+        console.log(`🔍 Procurando ordem ${orderId} no técnico ${fromTechnicianName}...`);
+        let found = false;
+        
+        Object.keys(newTechnicianGroups[fromTechnicianName] || {}).forEach(groupName => {
+          const orderIndex = newTechnicianGroups[fromTechnicianName][groupName].findIndex(order => order.id === orderId);
+          if (orderIndex !== -1) {
+            console.log(`✅ Encontrada ordem ${orderId} na seção ${groupName} do técnico ${fromTechnicianName}`);
+            const orderToMove = newTechnicianGroups[fromTechnicianName][groupName][orderIndex];
+            
+            // Remover da seção de origem
+            newTechnicianGroups[fromTechnicianName][groupName] = newTechnicianGroups[fromTechnicianName][groupName].filter(
+              order => order.id !== orderId
+            );
+            
+            ordersToMove.push(orderToMove);
+            found = true;
+            
+            // Adicionar resultado de sucesso para o modal
+            orderResults.push({
+              orderId: orderToMove.id,
+              cliente: orderToMove.cliente || orderToMove.TB01008_NOME,
+              status: 'success',
+              targetSection: toGroupName
+            });
+          }
+        });
+        
+        if (!found) {
+          console.log(`⚠️ Ordem ${orderId} não encontrada no técnico ${fromTechnicianName}`);
+        }
+      });
+      
+      // Garantir que o técnico de destino existe
+      if (!newTechnicianGroups[toTechnicianName]) {
+        newTechnicianGroups[toTechnicianName] = {};
+      }
+      
+      // Garantir que a seção de destino existe
+      if (!newTechnicianGroups[toTechnicianName][toGroupName]) {
+        newTechnicianGroups[toTechnicianName][toGroupName] = [];
+      }
+      
+      // Adicionar ordens à seção de destino
+      newTechnicianGroups[toTechnicianName][toGroupName] = [
+        ...newTechnicianGroups[toTechnicianName][toGroupName],
+        ...ordersToMove
+      ];
+      
+      console.log(`📋 Movidas ${ordersToMove.length} ordens para ${toTechnicianName} -> ${toGroupName}`);
+      
+      setTechnicianGroups(newTechnicianGroups);
+      setSelectedOrders([]); // Clear selection after success
+      
+      // Mostrar modal com resultados de sucesso
+      setOrderStatusResults(orderResults);
+      setOrderStatusSummary({
+        targetSection: toGroupName,
+        technicianName: toTechnicianName
+      });
+      setShowOrderStatusModal(true);
+      
+    } catch (error) {
+      console.error('❌ Erro na requisição de movimentação entre técnicos:', error);
+      
+      // Verificar se é erro de timeout
+      const isTimeoutError = error.name === 'AbortError' || error.message.includes('timeout');
+      const errorMessage = isTimeoutError 
+        ? 'Timeout na operação - a operação está demorando mais que o esperado. Tente novamente em alguns segundos.'
+        : error.message;
+      
+      // Criar resultados de erro para o modal
+      const errorResults = selectedOrders.map(orderId => ({
+        orderId,
+        status: 'error',
+        errorMessage: errorMessage,
+        cliente: 'N/A',
+        tecnico: fromTechnicianName,
+        targetSection: toGroupName
+      }));
+      
+      setOrderStatusResults(errorResults);
+      setOrderStatusSummary({
+        targetSection: toGroupName,
+        technicianName: toTechnicianName
       });
       setShowOrderStatusModal(true);
     } finally {
@@ -5566,7 +5764,7 @@ initializeApp();
   };
 
   // Componente para agrupar ordens por cidade dentro das colunas de técnicos
-  const TechnicianCityGroup = ({ cidade, ordens, technician, groupName, isDroppable = true }) => {
+  const TechnicianCityGroup = ({ cidade, ordens, technician, groupName, isDroppable = true, setIsDraggingOrder }) => {
     const getSLAColor = (sla) => {
       switch(sla) {
         case 'vencido':
@@ -5644,6 +5842,15 @@ initializeApp();
               draggable
               onDragStart={(e) => {
                 console.log(`🔄 Iniciando drag da ordem ${ordem.id} das colunas de técnicos`);
+                
+                // Impedir que o evento borbulhe para a coluna pai (que também é draggable)
+                e.stopPropagation();
+                
+                // Sinalizar que uma ordem está sendo arrastada para desabilitar o drag da coluna
+                if (setIsDraggingOrder) {
+                  setIsDraggingOrder(true);
+                }
+                
                 // Selecionar a ordem se não estiver selecionada
                 if (!selectedOrders.includes(ordem.id)) {
                   console.log(`✅ Selecionando ordem ${ordem.id} para drag`);
@@ -5651,8 +5858,15 @@ initializeApp();
                 }
                 e.dataTransfer.setData('orderId', ordem.id);
                 e.dataTransfer.setData('fromTechnician', 'true');
+                e.dataTransfer.setData('fromTechnicianName', technician);
                 e.dataTransfer.setData('fromGroup', groupName);
-                console.log(`📋 Dados de transferência definidos: orderId=${ordem.id}, fromTechnician=true, fromGroup=${groupName}`);
+                console.log(`📋 Dados de transferência definidos: orderId=${ordem.id}, fromTechnician=true, fromTechnicianName=${technician}, fromGroup=${groupName}`);
+              }}
+              onDragEnd={(e) => {
+                // Reativar o drag da coluna quando o drag da ordem terminar
+                if (setIsDraggingOrder) {
+                  setIsDraggingOrder(false);
+                }
               }}
             >
               <div className="technician-order-cell technician-order-id">
@@ -5681,7 +5895,7 @@ initializeApp();
     );
   };
 
-  const TechnicianServiceGroup = ({ groupName, orders, technician, isDroppable = true }) => {
+  const TechnicianServiceGroup = ({ groupName, orders, technician, isDroppable = true, setIsDraggingOrder }) => {
     // Agrupar ordens por cidade
     const groupedByCity = React.useMemo(() => {
       const groups = {};
@@ -5705,11 +5919,18 @@ initializeApp();
             
             // Verificar se é um drop entre seções do mesmo técnico
             const fromTechnician = e.dataTransfer.getData('fromTechnician');
+            const fromTechnicianName = e.dataTransfer.getData('fromTechnicianName');
             const fromGroup = e.dataTransfer.getData('fromGroup');
             
-            if (fromTechnician === 'true' && fromGroup && fromGroup !== groupName) {
-              // É um drop entre seções do mesmo técnico
-              handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
+            if (fromTechnician === 'true' && fromTechnicianName && fromGroup) {
+              // É um drop vindo de um técnico
+              if (fromTechnicianName === technician && fromGroup !== groupName) {
+                // É um drop entre seções do mesmo técnico
+                handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
+              } else if (fromTechnicianName !== technician) {
+                // É um drop entre técnicos diferentes
+                handleDropBetweenTechnicians(fromTechnicianName, technician, groupName);
+              }
             } else {
               // É um drop da coluna "Em aberto" para o técnico
               handleDropToTechnique(technician, groupName);
@@ -5736,6 +5957,7 @@ initializeApp();
                 technician={technician}
                 groupName={groupName}
                 isDroppable={isDroppable}
+                setIsDraggingOrder={setIsDraggingOrder}
               />
             ))}
           </div>
@@ -5834,6 +6056,7 @@ initializeApp();
 
   const TechnicianColumn = ({ technician, orders, index }) => {
     const [isDragging, setIsDragging] = React.useState(false);
+    const [isDraggingOrder, setIsDraggingOrder] = React.useState(false);
     const filterButtonRef = React.useRef(null);
     const menuButtonRef = React.useRef(null);
 
@@ -5924,9 +6147,14 @@ initializeApp();
 
     return (
       <div 
-        className={`kanban-column technician-column ${isDragging ? 'dragging' : ''}`}
+        className={`kanban-column technician-column ${isDragging ? 'dragging' : ''} ${isDraggingOrder ? 'dragging-order' : ''}`}
         draggable
         onDragStart={(e) => {
+          // Só permitir arrasto da coluna se não estivermos arrastando uma ordem
+          if (isDraggingOrder) {
+            e.preventDefault();
+            return;
+          }
           setIsDragging(true);
           e.dataTransfer.setData('columnIndex', index);
         }}
@@ -5997,6 +6225,7 @@ initializeApp();
               orders={groupOrders}
               technician={technician}
               isDroppable={groupName !== 'Em serviço'}
+              setIsDraggingOrder={setIsDraggingOrder}
             />
           ))}
         </div>
