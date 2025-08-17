@@ -1701,6 +1701,13 @@ function App() {
         setShowRouteModal(false);
         setRouteModalData(null);
         setRouteModalError(null);
+        
+        // Limpar instância do mapa se existir
+        if (window.mapInstance) {
+          console.log('🧹 Limpando instância do mapa ao clicar fora do modal...');
+          window.mapInstance.remove();
+          window.mapInstance = null;
+        }
       }
 
       // Fechar menu de logout
@@ -7262,19 +7269,19 @@ initializeApp();
         // Remover da seleção
         setSelectedMapOrders(prev => prev.filter(id => id !== orderId));
         
-        // Reordenar sequência
+        // Reordenar sequência (manter continuidade com ordens já roteirizadas)
         const remainingOrders = mapRoutedOrders.filter(routed => 
           (routed.id || routed.TB02115_CODIGO) !== orderId
         );
         
         const reorderedOrders = remainingOrders.map((order, index) => ({
           ...order,
-          routeSequence: index + 1,
-          routeOrder: index + 1
+          routeSequence: routedOrders.length + index + 1,
+          routeOrder: routedOrders.length + index + 1
         }));
         
         setMapRoutedOrders(reorderedOrders);
-        setMapRoutedSequence(reorderedOrders.length + 1);
+        setMapRoutedSequence(routedOrders.length + reorderedOrders.length + 1);
       }
     };
 
@@ -7297,14 +7304,75 @@ initializeApp();
       }
     };
 
+    // Função para remover ordem já roteirizada (via drag & drop) do mapa
+    const removeRoutedOrderFromMap = async (order) => {
+      const orderId = order.id || order.TB02115_CODIGO;
+      
+      try {
+        console.log(`🗑️ Removendo ordem ${orderId} da roteirização...`);
+        
+        // Chamar API para remover do banco de dados
+        const response = await fetch(`${API_BASE_URL}/api/route/remove-order`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            technicianId: routeData.technicianId,
+            orderNumber: orderId,
+            forecast: routeData.forecastDate
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('✅ Ordem removida da roteirização:', result.message);
+          
+          // Mover ordem da lista "Roteirizadas" para "Não Roteirizadas"
+          setUnroutedOrders(prev => [...prev, { ...order, isRouted: false, routeSequence: null }]);
+          
+          // Remover da lista "Roteirizadas" e reordenar
+          setRoutedOrders(prev => {
+            const filtered = prev.filter(routedOrder => 
+              (routedOrder.id || routedOrder.TB02115_CODIGO) !== orderId
+            );
+            const reordered = filtered.map((order, index) => ({
+              ...order,
+              routeOrder: index + 1,
+              routeSequence: index + 1
+            }));
+            return reordered;
+          });
+          
+          console.log(`📋 Ordem ${orderId} movida para "Não Roteirizadas"`);
+          
+          // Fechar tooltip se a ordem removida estava sendo exibida
+          if (mapTooltipOrder && (mapTooltipOrder.id || mapTooltipOrder.TB02115_CODIGO) === orderId) {
+            setMapTooltipOrder(null);
+          }
+          
+        } else {
+          console.error('❌ Erro ao remover ordem da roteirização:', result.message);
+          alert('Erro ao remover ordem da roteirização: ' + result.message);
+        }
+        
+      } catch (error) {
+        console.error('❌ Erro na requisição de remoção:', error);
+        alert('Erro ao conectar com o servidor para remover a ordem.');
+      }
+    };
+
     const getMapRouteProgress = () => {
       const totalAvailable = unroutedOrders.length;
       const totalRouted = mapRoutedOrders.length;
+      const totalAlreadyRouted = routedOrders.length;
       const remaining = totalAvailable - totalRouted;
       
       return {
         total: totalAvailable,
         routed: totalRouted,
+        alreadyRouted: totalAlreadyRouted,
         remaining: remaining,
         percentage: totalAvailable > 0 ? Math.round((totalRouted / totalAvailable) * 100) : 0
       };
@@ -7367,6 +7435,8 @@ initializeApp();
     // Carregar coordenadas quando as ordens mudarem
     React.useEffect(() => {
       if (unroutedOrders.length > 0 || routedOrders.length > 0) {
+        console.log(`📍 Carregando coordenadas: ${unroutedOrders.length} não roteirizadas, ${routedOrders.length} roteirizadas`);
+        
         // Aguardar um pouco para garantir que as ordens foram processadas
         const timer = setTimeout(() => {
           loadAllOrdersCoordinates();
@@ -7436,7 +7506,9 @@ initializeApp();
         const newSequence = routedOrders.length + 1;
         const newRoutedOrder = {
           ...draggedOrder,
-          routeOrder: newSequence
+          routeOrder: newSequence,
+          isRouted: true,
+          routeSequence: newSequence
         };
         
         // Inserir no banco de dados
@@ -7461,6 +7533,8 @@ initializeApp();
             setUnroutedOrders(unroutedOrders.filter(order => 
               order.id !== draggedOrder.id && order.TB02115_CODIGO !== draggedOrder.TB02115_CODIGO
             ));
+            
+            console.log(`📋 Ordem ${draggedOrder.id || draggedOrder.TB02115_CODIGO} movida para roteirizadas via drag & drop (isRouted: true, routeSequence: ${newSequence})`);
           } else {
             console.error('❌ Erro ao inserir ordem na roteirização:', result.message);
             // Não atualizar o estado se houve erro no banco
@@ -7505,10 +7579,29 @@ initializeApp();
           const result = await response.json();
           if (result.success) {
             console.log('✅ Ordem removida da roteirização:', result.message);
-            setUnroutedOrders([...unroutedOrders, draggedOrder]);
-            setRoutedOrders(routedOrders.filter(order => 
+            
+            // Adicionar ordem à lista não roteirizadas, marcando como não roteirizada
+            const unroutedOrder = { 
+              ...draggedOrder, 
+              isRouted: false, 
+              routeSequence: null 
+            };
+            setUnroutedOrders([...unroutedOrders, unroutedOrder]);
+            
+            // Remover da lista roteirizadas e reordenar sequências
+            setRoutedOrders(prev => {
+              const filtered = prev.filter(order => 
               order.id !== draggedOrder.id && order.TB02115_CODIGO !== draggedOrder.TB02115_CODIGO
-            ));
+              );
+              const reordered = filtered.map((order, index) => ({
+                ...order,
+                routeOrder: index + 1,
+                routeSequence: index + 1
+              }));
+              return reordered;
+            });
+            
+            console.log(`📋 Ordem ${draggedOrder.id || draggedOrder.TB02115_CODIGO} movida para não roteirizadas via drag & drop`);
           } else {
             console.error('❌ Erro ao remover ordem da roteirização:', result.message);
             // Não atualizar o estado se houve erro no banco
@@ -7736,8 +7829,8 @@ initializeApp();
       setIsLoadingAllCoordinates(true);
       
       try {
-        // Usar routeData.orders como fonte principal, com fallback para as listas processadas
-        const ordersToProcess = routeData?.orders || [...unroutedOrders, ...routedOrders];
+        // Usar as listas atualizadas (que refletem mudanças via drag & drop)
+        const ordersToProcess = [...unroutedOrders, ...routedOrders];
         
         if (!ordersToProcess || ordersToProcess.length === 0) {
           console.log('⚠️ Nenhuma ordem encontrada para processar coordenadas');
@@ -7894,8 +7987,16 @@ initializeApp();
         return;
       }
 
-      // Filtrar ordens com coordenadas disponíveis
-      const ordersWithCoordinates = unroutedOrders.filter(order => {
+      // Se o mapa já existe, apenas atualizar os marcadores
+      if (window.mapInstance) {
+        console.log('🔄 Mapa já existe, atualizando marcadores...');
+        updateMapMarkers();
+        return;
+      }
+
+      // Filtrar ordens com coordenadas disponíveis (incluindo roteirizadas e não roteirizadas)
+      const allOrders = [...unroutedOrders, ...routedOrders];
+      const ordersWithCoordinates = allOrders.filter(order => {
         const orderId = order.id || order.TB02115_CODIGO;
         return coordinatesCache[orderId];
       });
@@ -7934,8 +8035,27 @@ initializeApp();
           const position = [coordinates.lat, coordinates.lng];
           bounds.push(position);
 
-          // Verificar se alguma ordem do grupo está na rota
-          const hasRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          // Verificar se alguma ordem do grupo está na rota atual do mapa ou já foi roteirizada
+          const hasMapRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          const hasAlreadyRoutedOrders = orders.some(order => order.isRouted && order.routeSequence);
+          
+          // Debug para marcadores problemáticos
+          if (orders.length > 0) {
+            const firstOrder = orders[0];
+            const orderId = firstOrder.id || firstOrder.TB02115_CODIGO;
+            if (hasAlreadyRoutedOrders) {
+              console.log(`🟢 Marcador verde para ${locationKey} (${orderId}): ${orders.length} ordens, ${orders.filter(o => o.isRouted).length} roteirizadas`);
+            }
+          }
+          
+          // Definir cor do marcador baseado no status (priorizar ordens roteirizadas)
+          let markerColor = '#ef4444'; // Vermelho para não roteirizadas
+          if (hasMapRoutedOrders) {
+            markerColor = '#10b981'; // Verde claro para ordens adicionadas na rota atual do mapa
+          } else if (hasAlreadyRoutedOrders) {
+            // Se há pelo menos uma ordem roteirizada no grupo, mostrar verde escuro
+            markerColor = '#059669'; // Verde escuro para ordens já roteirizadas anteriormente
+          }
           
           // Criar marcador personalizado com quantidade de ordens
           const customIcon = window.L.divIcon({
@@ -7944,7 +8064,7 @@ initializeApp();
               <div style="
                 width: ${orders.length > 9 ? '28px' : '24px'}; 
                 height: 24px; 
-                background: ${hasRoutedOrders ? '#10b981' : '#ef4444'}; 
+                background: ${markerColor}; 
                 border: 2px solid white; 
                 border-radius: 50%; 
                 display: flex; 
@@ -8034,6 +8154,7 @@ initializeApp();
       }
 
       console.log('🔄 Atualizando marcadores do mapa');
+      console.log(`📊 Estado atual: ${unroutedOrders.length} não roteirizadas, ${routedOrders.length} roteirizadas, ${mapRoutedOrders.length} na rota do mapa`);
       
       // Remover todos os marcadores existentes
       window.mapInstance.eachLayer((layer) => {
@@ -8042,8 +8163,9 @@ initializeApp();
         }
       });
 
-      // Verificar se há ordens com coordenadas
-      const ordersWithCoordinates = unroutedOrders.filter(order => {
+      // Verificar se há ordens com coordenadas (incluindo roteirizadas e não roteirizadas)
+      const allOrders = [...unroutedOrders, ...routedOrders];
+      const ordersWithCoordinates = allOrders.filter(order => {
         const orderId = order.id || order.TB02115_CODIGO;
         return coordinatesCache[orderId];
       });
@@ -8080,8 +8202,27 @@ initializeApp();
           const position = [coordinates.lat, coordinates.lng];
           bounds.push(position);
 
-          // Verificar se alguma ordem do grupo está na rota
-          const hasRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          // Verificar se alguma ordem do grupo está na rota atual do mapa ou já foi roteirizada
+          const hasMapRoutedOrders = orders.some(order => isOrderInMapRoute(order));
+          const hasAlreadyRoutedOrders = orders.some(order => order.isRouted && order.routeSequence);
+          
+          // Debug para marcadores problemáticos
+          if (orders.length > 0) {
+            const firstOrder = orders[0];
+            const orderId = firstOrder.id || firstOrder.TB02115_CODIGO;
+            if (hasAlreadyRoutedOrders) {
+              console.log(`🟢 Marcador verde para ${locationKey} (${orderId}): ${orders.length} ordens, ${orders.filter(o => o.isRouted).length} roteirizadas`);
+            }
+          }
+          
+          // Definir cor do marcador baseado no status (priorizar ordens roteirizadas)
+          let markerColor = '#ef4444'; // Vermelho para não roteirizadas
+          if (hasMapRoutedOrders) {
+            markerColor = '#10b981'; // Verde claro para ordens adicionadas na rota atual do mapa
+          } else if (hasAlreadyRoutedOrders) {
+            // Se há pelo menos uma ordem roteirizada no grupo, mostrar verde escuro
+            markerColor = '#059669'; // Verde escuro para ordens já roteirizadas anteriormente
+          }
           
           // Criar marcador personalizado com quantidade de ordens
           const customIcon = window.L.divIcon({
@@ -8090,7 +8231,7 @@ initializeApp();
               <div style="
                 width: ${orders.length > 9 ? '28px' : '24px'}; 
                 height: 24px; 
-                background: ${hasRoutedOrders ? '#10b981' : '#ef4444'}; 
+                background: ${markerColor}; 
                 border: 2px solid white; 
                 border-radius: 50%; 
                 display: flex; 
@@ -8143,8 +8284,25 @@ initializeApp();
         }, 100);
         
         return () => clearTimeout(timer);
+      } else {
+        // Limpar instância do mapa quando o modal for fechado
+        if (window.mapInstance) {
+          console.log('🧹 Limpando instância do mapa...');
+          window.mapInstance.remove();
+          window.mapInstance = null;
+        }
       }
-    }, [showUnroutedMap, coordinatesCache, unroutedOrders]);
+    }, [showUnroutedMap, coordinatesCache, unroutedOrders, routedOrders]);
+
+    // useEffect para ajustar a sequência do mapa baseado nas ordens já roteirizadas
+    React.useEffect(() => {
+      if (showUnroutedMap) {
+        // Calcular a próxima sequência baseada nas ordens já roteirizadas
+        const nextSequence = routedOrders.length + 1;
+        console.log(`🔢 Ajustando sequência do mapa para: ${nextSequence} (baseado em ${routedOrders.length} ordens já roteirizadas)`);
+        setMapRoutedSequence(nextSequence);
+      }
+    }, [showUnroutedMap, routedOrders.length]);
 
     // useEffect separado para atualizar marcadores quando a roteirização mudar
     React.useEffect(() => {
@@ -8152,7 +8310,7 @@ initializeApp();
         // Atualizar apenas os marcadores existentes sem reinicializar o mapa
         updateMapMarkers();
       }
-    }, [mapRoutedOrders]);
+    }, [mapRoutedOrders, routedOrders, unroutedOrders]);
 
     // Função para imprimir o roteiro
     const printRoute = () => {
@@ -8749,17 +8907,13 @@ initializeApp();
                 <div className="route-map-modal-title-section">
                   <h2>
                     <i className="bi bi-geo-alt"></i>
-                    Mapa - Ordens Não Roteirizadas
+                    Mapa - Roteirização
                   </h2>
                   {(() => {
-                    const ordersWithCoordinates = unroutedOrders.filter(order => {
+                    const allOrders = [...unroutedOrders, ...routedOrders];
+                    const ordersWithCoordinates = allOrders.filter(order => {
                       const orderId = order.id || order.TB02115_CODIGO;
                       return coordinatesCache[orderId];
-                    });
-                    
-                    const ordersWithoutCoordinates = unroutedOrders.filter(order => {
-                      const orderId = order.id || order.TB02115_CODIGO;
-                      return !coordinatesCache[orderId];
                     });
                     
                     const locationGroups = groupOrdersByLocation(ordersWithCoordinates);
@@ -8768,7 +8922,7 @@ initializeApp();
                     return (
                       <div className="route-map-info">
                         <span className="route-map-count">
-                          {uniqueLocations} pontos no mapa • {unroutedOrders.length} ordens carregadas
+                          {uniqueLocations} pontos no mapa • {allOrders.length} ordens carregadas ({routedOrders.length} roteirizadas, {unroutedOrders.length} não roteirizadas)
                         </span>
                       </div>
                     );
@@ -8806,7 +8960,7 @@ initializeApp();
                               {progress.routed} de {progress.total} ({progress.percentage}%)
                             </div>
                             <div className="route-progress-remaining">
-                              {progress.remaining} restantes
+                              {progress.remaining} restantes • {progress.alreadyRouted} já roteirizadas
                             </div>
                           </div>
                         );
@@ -8814,15 +8968,71 @@ initializeApp();
                     </div>
                     
                     <div className="route-map-sidebar-content">
-                      {mapRoutedOrders.length === 0 ? (
+                      {/* Seção para ordens já roteirizadas anteriormente */}
+                      {routedOrders.length > 0 && (
+                        <div style={{ marginBottom: '20px' }}>
+                          <h4 style={{ 
+                            fontSize: '14px', 
+                            color: '#475569', 
+                            margin: '0 0 12px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <i className="bi bi-check-circle-fill" style={{ color: '#059669' }}></i>
+                            Ordens já roteirizadas ({routedOrders.length})
+                          </h4>
+                          <div className="route-orders-list">
+                            {routedOrders.map((order, index) => (
+                              <div key={`routed-${index}`} className="route-order-item" style={{ borderColor: '#059669', backgroundColor: '#f0fdf4' }}>
+                                <div className="route-order-header">
+                                  <div className="route-order-left">
+                                    <span className="route-order-sequence" style={{ backgroundColor: '#059669' }}>{order.routeOrder}</span>
+                                    <span className="route-order-number">
+                                      OS {order.id || order.TB02115_CODIGO}
+                                    </span>
+                                  </div>
+                                  <button 
+                                    className="route-order-remove-btn"
+                                    onClick={() => removeRoutedOrderFromMap(order)}
+                                    title="Remover da roteirização"
+                                    style={{ color: '#059669' }}
+                                  >
+                                    <i className="bi bi-x"></i>
+                                  </button>
+                                </div>
+                                <div className="route-order-details">
+                                  <p><strong>Cliente:</strong> {order.cliente || order.TB01008_NOME}</p>
+                                  <p><strong>Endereço:</strong> {order.endereco || order.TB02115_ENDERECO}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Seção para ordens sendo roteirizadas agora */}
+                      {mapRoutedOrders.length === 0 && routedOrders.length === 0 ? (
                         <div className="route-empty-state">
                           <i className="bi bi-info-circle"></i>
                           <p>Clique nos pontos do mapa e selecione "Incluir na rota" para começar a roteirização</p>
                         </div>
-                      ) : (
+                      ) : mapRoutedOrders.length > 0 ? (
+                        <div>
+                          <h4 style={{ 
+                            fontSize: '14px', 
+                            color: '#475569', 
+                            margin: '0 0 12px 0',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <i className="bi bi-clock" style={{ color: '#10b981' }}></i>
+                            Roteirização atual ({mapRoutedOrders.length})
+                          </h4>
                         <div className="route-orders-list">
                           {mapRoutedOrders.map((order, index) => (
-                            <div key={index} className="route-order-item">
+                              <div key={`current-${index}`} className="route-order-item">
                               <div className="route-order-header">
                                 <div className="route-order-left">
                                   <span className="route-order-sequence">{order.routeOrder}</span>
@@ -8845,7 +9055,8 @@ initializeApp();
                             </div>
                           ))}
                         </div>
-                      )}
+                        </div>
+                      ) : null}
                       
                       {/* Botão para salvar roteirização */}
                       {mapRoutedOrders.length > 0 && (
@@ -8854,11 +9065,12 @@ initializeApp();
                             className="route-save-btn"
                             onClick={async () => {
                               try {
-                                console.log(`💾 Salvando roteirização com ${mapRoutedOrders.length} ordens`);
+                                console.log(`💾 Salvando roteirização com ${mapRoutedOrders.length} ordens do mapa (sequência iniciando em ${routedOrders.length + 1})`);
                                 
                                 // Salvar todas as ordens roteiradas no backend
                                 const savePromises = mapRoutedOrders.map((order, index) => {
-                                  const sequence = index + 1;
+                                  // Calcular sequência considerando ordens já roteirizadas
+                                  const sequence = routedOrders.length + index + 1;
                                   return fetch(`${API_BASE_URL}/api/route/add-order`, {
                                     method: 'POST',
                                     headers: {
@@ -8890,7 +9102,9 @@ initializeApp();
                                   // Adicionar ordens roteiradas à lista "Roteirizadas"
                                   const newRoutedOrders = mapRoutedOrders.map((order, index) => ({
                                     ...order,
-                                    routeOrder: index + 1
+                                    routeOrder: routedOrders.length + index + 1,
+                                    isRouted: true,
+                                    routeSequence: routedOrders.length + index + 1
                                   }));
                                   
                                   setRoutedOrders(prev => [...prev, ...newRoutedOrders]);
@@ -9247,6 +9461,18 @@ initializeApp();
                         >
                           <i className="bi bi-dash-circle"></i>
                           Retirar da rota
+                        </button>
+                      ) : mapTooltipOrder.isRouted && mapTooltipOrder.routeSequence ? (
+                        <button 
+                          className="order-tooltip-action-btn remove-routed-btn"
+                          onClick={() => {
+                            removeRoutedOrderFromMap(mapTooltipOrder);
+                            setMapTooltipOrder(null);
+                          }}
+                          style={{ backgroundColor: '#dc2626', borderColor: '#dc2626' }}
+                        >
+                          <i className="bi bi-x-circle"></i>
+                          Remover da roteirização
                         </button>
                       ) : (
                         <button 
@@ -13088,6 +13314,13 @@ initializeApp();
           setShowRouteModal(false);
           setRouteModalData(null);
           setRouteModalError(null);
+          
+          // Limpar instância do mapa se existir
+          if (window.mapInstance) {
+            console.log('🧹 Limpando instância do mapa ao fechar modal de rota...');
+            window.mapInstance.remove();
+            window.mapInstance = null;
+          }
         }}
       />
 
