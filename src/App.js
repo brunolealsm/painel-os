@@ -7153,6 +7153,8 @@ initializeApp();
     const [selectedMapOrders, setSelectedMapOrders] = React.useState([]);
     const [mapRoutedOrders, setMapRoutedOrders] = React.useState([]);
     const [mapRoutedSequence, setMapRoutedSequence] = React.useState(1);
+    const [savingRoute, setSavingRoute] = React.useState(false);
+    const [saveProgress, setSaveProgress] = React.useState({ current: 0, total: 0 });
     
     // Função para validar se as coordenadas estão no Brasil
     const isValidBrazilianCoordinates = (lat, lng) => {
@@ -7470,6 +7472,8 @@ initializeApp();
         setSelectedMapOrders([]);
         setMapRoutedSequence(1);
         setMapTooltipOrder(null);
+        setSavingRoute(false);
+        setSaveProgress({ current: 0, total: 0 });
         
         // Limpar instância do mapa
         if (window.mapInstance) {
@@ -9063,30 +9067,79 @@ initializeApp();
                         <div className="route-save-section">
                           <button 
                             className="route-save-btn"
+                            disabled={savingRoute}
                             onClick={async () => {
                               try {
+                                setSavingRoute(true);
+                                setSaveProgress({ current: 0, total: mapRoutedOrders.length });
                                 console.log(`💾 Salvando roteirização com ${mapRoutedOrders.length} ordens do mapa (sequência iniciando em ${routedOrders.length + 1})`);
                                 
-                                // Salvar todas as ordens roteiradas no backend
-                                const savePromises = mapRoutedOrders.map((order, index) => {
-                                  // Calcular sequência considerando ordens já roteirizadas
-                                  const sequence = routedOrders.length + index + 1;
-                                  return fetch(`${API_BASE_URL}/api/route/add-order`, {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                      technicianId: routeData.technicianId,
-                                      orderNumber: order.id || order.TB02115_CODIGO,
-                                      sequence: sequence,
-                                      forecast: routeData.forecastDate
-                                    })
-                                  });
-                                });
+                                // Salvar ordens sequencialmente para evitar sobrecarga no backend
+                                const results = [];
                                 
-                                const responses = await Promise.all(savePromises);
-                                const results = await Promise.all(responses.map(res => res.json()));
+                                for (let i = 0; i < mapRoutedOrders.length; i++) {
+                                  const order = mapRoutedOrders[i];
+                                  const sequence = routedOrders.length + i + 1;
+                                  
+                                  // Tentar salvar com retry em caso de falha
+                                  let attempt = 1;
+                                  const maxAttempts = 3;
+                                  let success = false;
+                                  
+                                  while (attempt <= maxAttempts && !success) {
+                                    try {
+                                      console.log(`💾 Salvando ordem ${i + 1}/${mapRoutedOrders.length}: ${order.id || order.TB02115_CODIGO} (tentativa ${attempt}/${maxAttempts})`);
+                                      
+                                      // Criar AbortController para timeout
+                                      const controller = new AbortController();
+                                      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
+                                      
+                                      const response = await fetch(`${API_BASE_URL}/api/route/add-order`, {
+                                        method: 'POST',
+                                        headers: {
+                                          'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                          technicianId: routeData.technicianId,
+                                          orderNumber: order.id || order.TB02115_CODIGO,
+                                          sequence: sequence,
+                                          forecast: routeData.forecastDate
+                                        }),
+                                        signal: controller.signal
+                                      });
+                                      
+                                      clearTimeout(timeoutId);
+                                      
+                                      const result = await response.json();
+                                      results.push(result);
+                                      success = true;
+                                      
+                                      // Atualizar progresso
+                                      setSaveProgress({ current: i + 1, total: mapRoutedOrders.length });
+                                      
+                                    } catch (error) {
+                                      console.error(`❌ Erro na tentativa ${attempt} para ordem ${order.id || order.TB02115_CODIGO}:`, error);
+                                      
+                                      if (attempt === maxAttempts) {
+                                        // Última tentativa falhou
+                                        results.push({ 
+                                          success: false, 
+                                          message: `Erro após ${maxAttempts} tentativas: ` + error.message 
+                                        });
+                                      } else {
+                                        // Aguardar um pouco antes da próxima tentativa
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                      }
+                                      
+                                      attempt++;
+                                    }
+                                  }
+                                  
+                                  // Pequeno delay entre ordens para evitar sobrecarga
+                                  if (i < mapRoutedOrders.length - 1) {
+                                    await new Promise(resolve => setTimeout(resolve, 200));
+                                  }
+                                }
                                 
                                 const successCount = results.filter(result => result.success).length;
                                 const errorCount = results.filter(result => !result.success).length;
@@ -9138,11 +9191,13 @@ initializeApp();
                               } catch (error) {
                                 console.error('❌ Erro ao salvar roteirização:', error);
                                 alert('❌ Erro ao salvar roteirização: ' + error.message);
+                              } finally {
+                                setSavingRoute(false);
                               }
                             }}
                           >
-                            <i className="bi bi-check-circle"></i>
-                            Salvar Roteirização
+                            <i className={savingRoute ? "bi bi-hourglass-split" : "bi bi-check-circle"}></i>
+                            {savingRoute ? `Salvando... (${saveProgress.current}/${saveProgress.total})` : 'Salvar Roteirização'}
                           </button>
                         </div>
                       )}
