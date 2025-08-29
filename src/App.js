@@ -2682,6 +2682,14 @@ initializeApp();
     // Se a ordem já vem com campos mapeados do backend, preservar TUDO mas garantir campos essenciais
     if (ordem.dataAbertura !== undefined || ordem.contrato !== undefined || ordem.numeroSerie !== undefined) {
       console.log('🔍 Frontend - Preservando campos do backend para ordem:', ordem.id);
+      
+      // Debug: verificar se RoteiroHoje está chegando do backend
+      console.log(`🔍 DEBUG Backend Data - Ordem ${ordem.id}:`, {
+        RoteiroHoje: ordem.RoteiroHoje,
+        RoteiroHojeType: typeof ordem.RoteiroHoje,
+        hasRoteiroHoje: 'RoteiroHoje' in ordem
+      });
+      
       return {
         ...ordem, // Preservar TODOS os campos que vêm do backend
         // Garantir campos essenciais para o frontend
@@ -2727,7 +2735,8 @@ initializeApp();
       CALC_RESTANTE: ordem.CALC_RESTANTE,
       TB01047_NOME: ordem.TB01047_NOME, // Marca
       TB01018_NOME: ordem.TB01018_NOME, // Subgrupo
-      TB01073_NOME: ordem.TB01073_NOME  // Status
+      TB01073_NOME: ordem.TB01073_NOME, // Status
+      RoteiroHoje: ordem.RoteiroHoje     // Campo para cor do roteiro de hoje
     };
   };
 
@@ -2844,7 +2853,7 @@ initializeApp();
         });
         
         console.log('🔍 ÁREA: Técnicos na intersecção (área + coordenador):', newTechnicians);
-        updatedFilters.tecnico = newTechnicians;
+      updatedFilters.tecnico = newTechnicians;
       } else {
         // Se só há área selecionada: mostrar APENAS técnicos das áreas
         console.log('🔄 ÁREA: Apenas área selecionada - substituindo lista completa');
@@ -5877,7 +5886,28 @@ initializeApp();
                   {getServiceIcon(ordem.tipo)}
                 </span>
                 {getSLAIndicator(ordem.sla)}
-                <span className="order-id-text">{ordem.id}</span>
+                <span 
+                  className="order-id-text"
+                  style={{
+                    color: (groupName === 'Previsto para hoje' && ordem.RoteiroHoje === 1) 
+                      ? '#0000CD' 
+                      : undefined
+                  }}
+                >
+                  {(() => {
+                    // Debug: verificar se a condição está sendo avaliada
+                    if (groupName === 'Previsto para hoje') {
+                      console.log(`🔍 DEBUG RoteiroHoje - Ordem ${ordem.id}:`, {
+                        groupName,
+                        RoteiroHoje: ordem.RoteiroHoje,
+                        RoteiroHojeType: typeof ordem.RoteiroHoje,
+                        condition: ordem.RoteiroHoje === 1,
+                        shouldApplyColor: (groupName === 'Previsto para hoje' && ordem.RoteiroHoje === 1)
+                      });
+                    }
+                    return ordem.id;
+                  })()}
+                </span>
                 {ordem.pedidoVinculado && (
                   <i className="bi bi-box-seam pedido-vinculado-icon" title={`Pedido vinculado: ${ordem.pedidoVinculado}`}></i>
                 )}
@@ -5925,8 +5955,8 @@ initializeApp();
             if (fromTechnician === 'true' && fromTechnicianName && fromGroup) {
               // É um drop vindo de um técnico
               if (fromTechnicianName === technician && fromGroup !== groupName) {
-                // É um drop entre seções do mesmo técnico
-                handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
+              // É um drop entre seções do mesmo técnico
+              handleDropBetweenTechnicianSections(technician, fromGroup, groupName);
               } else if (fromTechnicianName !== technician) {
                 // É um drop entre técnicos diferentes
                 handleDropBetweenTechnicians(fromTechnicianName, technician, groupName);
@@ -6503,10 +6533,10 @@ initializeApp();
             }, timeoutMs);
             
             response = await fetch(`${API_BASE_URL}/api/orders/today-route/${technicianId}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
               signal: controller.signal
             });
             
@@ -6603,10 +6633,10 @@ initializeApp();
             }, timeoutMs);
             
             response = await fetch(`${API_BASE_URL}/api/orders/completed-route/${technicianId}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
               signal: controller.signal
             });
             
@@ -6944,10 +6974,10 @@ initializeApp();
             }, timeoutMs);
             
             response = await fetch(`${API_BASE_URL}/api/orders/update-sequence`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
               body: JSON.stringify(requestBody),
               signal: controller.signal
             });
@@ -7057,8 +7087,8 @@ initializeApp();
         console.log('🔗 URL da API:', `${API_BASE_URL}/api/orders/reorder-sequence`);
         
         const requestBody = {
-          technicianId,
-          reorderedItems: reorderedData
+            technicianId,
+            reorderedItems: reorderedData
         };
         
         console.log('📤 Body da requisição:', JSON.stringify(requestBody, null, 2));
@@ -7187,17 +7217,17 @@ initializeApp();
           console.log('❌ Dados insuficientes para salvar sequência');
           return;
         }
-        
-        const newSequence = parseInt(sequenceInputValue);
-        if (isNaN(newSequence) || newSequence < 1) {
-          alert('Por favor, digite um número válido maior que 0');
-          return;
-        }
+      
+      const newSequence = parseInt(sequenceInputValue);
+      if (isNaN(newSequence) || newSequence < 1) {
+        alert('Por favor, digite um número válido maior que 0');
+        return;
+      }
         
         console.log('📊 Nova sequência solicitada:', newSequence);
-        
-        // Encontrar a ordem
-        const ordem = routeData.find(item => item.TB02115_CODIGO === showSequenceInput);
+      
+      // Encontrar a ordem
+      const ordem = routeData.find(item => item.TB02115_CODIGO === showSequenceInput);
         if (!ordem) {
           console.error('❌ Ordem não encontrada nos dados:', showSequenceInput);
           alert('Erro: Ordem de serviço não encontrada');
@@ -7214,8 +7244,8 @@ initializeApp();
         await updateSequence(ordem.TB02115_CODIGO, newSequence);
         
         console.log('✅ Sequência salva com sucesso!');
-        setShowSequenceInput(null);
-        setSequenceInputValue('');
+      setShowSequenceInput(null);
+      setSequenceInputValue('');
         
       } catch (error) {
         console.error('❌ Erro ao salvar sequência:', error);
@@ -9730,15 +9760,15 @@ initializeApp();
                                       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos timeout
                                       
                                       const response = await fetch(`${API_BASE_URL}/api/route/add-order`, {
-                                        method: 'POST',
-                                        headers: {
-                                          'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                          technicianId: routeData.technicianId,
-                                          orderNumber: order.id || order.TB02115_CODIGO,
-                                          sequence: sequence,
-                                          forecast: routeData.forecastDate
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      technicianId: routeData.technicianId,
+                                      orderNumber: order.id || order.TB02115_CODIGO,
+                                      sequence: sequence,
+                                      forecast: routeData.forecastDate
                                         }),
                                         signal: controller.signal
                                       });
